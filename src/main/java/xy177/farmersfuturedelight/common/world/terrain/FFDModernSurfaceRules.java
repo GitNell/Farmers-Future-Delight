@@ -702,6 +702,7 @@ public final class FFDModernSurfaceRules {
         private final int startZ;
         private final Map<String, Double> noise2d = new HashMap<>();
         private final Map<String, Double> noise3d = new HashMap<>();
+        private final Map<String, Boolean> modernBiomeMatches = new HashMap<>();
 
         private int localX;
         private int localZ;
@@ -744,6 +745,7 @@ public final class FFDModernSurfaceRules {
             biomeId = registryName == null ? "" : registryName.toString();
             noise2d.clear();
             noise3d.clear();
+            modernBiomeMatches.clear();
             double surface = data.sampleNoise("minecraft:surface", blockX, 0, blockZ);
             surfaceDepth = (int) (surface * 2.75D + 3.0D
                     + data.positionalRandomAt(blockX, 0, blockZ).nextDouble() * 0.25D);
@@ -756,10 +758,16 @@ public final class FFDModernSurfaceRules {
             this.stoneDepthBelow = stoneDepthBelow;
             this.waterHeight = waterHeight;
             this.blockY = blockY;
-            FFDVerticalBiome sampledBiome = FFDVerticalBiomeZoomer.getBiome(
-                    biomeZoomSeed, blockX, blockY, blockZ, verticalBiomeSource);
-            verticalBiome = sampledBiome;
+            verticalBiome = null;
             noise3d.clear();
+        }
+
+        private FFDVerticalBiome sampledVerticalBiome() {
+            if (verticalBiome == null) {
+                verticalBiome = FFDVerticalBiomeZoomer.getBiome(
+                        biomeZoomSeed, blockX, blockY, blockZ, verticalBiomeSource);
+            }
+            return verticalBiome;
         }
 
         private FFDVerticalBiome rawVerticalBiome(int quartX, int quartY, int quartZ) {
@@ -811,12 +819,12 @@ public final class FFDModernSurfaceRules {
         }
 
         private IBlockState defaultTopState() {
-            return verticalBiome == FFDVerticalBiome.MEADOW
+            return sampledVerticalBiome() == FFDVerticalBiome.MEADOW
                     ? Blocks.GRASS.getDefaultState() : biome.topBlock;
         }
 
         private IBlockState defaultFillerState() {
-            return verticalBiome == FFDVerticalBiome.MEADOW
+            return sampledVerticalBiome() == FFDVerticalBiome.MEADOW
                     ? Blocks.DIRT.getDefaultState() : biome.fillerBlock;
         }
 
@@ -846,11 +854,17 @@ public final class FFDModernSurfaceRules {
             }
             FFDVerticalBiome targetBiome = verticalBiome(target);
             if (targetBiome != null) {
-                return verticalBiome == targetBiome;
+                return sampledVerticalBiome() == targetBiome;
             }
-            return target.startsWith("minecraft:")
-                    ? terrainBridge.matchesModernBiome(blockX, blockZ, target)
-                    : target.equals(biomeId);
+            if (!target.startsWith("minecraft:")) {
+                return target.equals(biomeId);
+            }
+            Boolean matches = modernBiomeMatches.get(target);
+            if (matches == null) {
+                matches = terrainBridge.matchesModernBiome(blockX, blockZ, target);
+                modernBiomeMatches.put(target, matches);
+            }
+            return matches;
         }
 
         @Nullable

@@ -40,6 +40,7 @@ public class BlockAzaleaLeaves extends BlockLeaves implements IWaterloggableBloc
 
     public BlockAzaleaLeaves(boolean flowering) {
         this.flowering = flowering;
+        this.leavesFancy = true;
         String name = flowering ? "flowering_azalea_leaves" : "azalea_leaves";
         setRegistryName(FarmerFutureDelight.MODID, name);
         setUnlocalizedName(FarmerFutureDelight.MODID + "." + name);
@@ -178,16 +179,6 @@ public class BlockAzaleaLeaves extends BlockLeaves implements IWaterloggableBloc
     public boolean canRenderInLayer(IBlockState state, BlockRenderLayer layer) {
         return layer == BlockRenderLayer.CUTOUT_MIPPED
                 || isWaterloggedState(state) && layer == BlockRenderLayer.TRANSLUCENT;
-    }
-
-    @Override
-    public boolean shouldSideBeRendered(IBlockState state, IBlockAccess world, BlockPos pos,
-                                        EnumFacing side) {
-        if (isWaterloggedState(state)
-                && WaterloggedBlockApi.containsWater(world, pos.offset(side))) {
-            return false;
-        }
-        return super.shouldSideBeRendered(state, world, pos, side);
     }
 
     @Override

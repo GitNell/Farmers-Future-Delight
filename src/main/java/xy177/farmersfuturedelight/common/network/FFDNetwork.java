@@ -36,6 +36,8 @@ public final class FFDNetwork {
                 PacketFluidMigration.class, 6, Side.CLIENT);
         CHANNEL.registerMessage(PacketFluidMigration.ServerHandler.class,
                 PacketFluidMigration.class, 7, Side.SERVER);
+        CHANNEL.registerMessage(PacketDrownedConverting.Handler.class,
+                PacketDrownedConverting.class, 8, Side.CLIENT);
     }
 
     public static void sendVerticalBiomes(EntityPlayerMP player, int dimension,
@@ -96,6 +98,23 @@ public final class FFDNetwork {
         PacketRiptideState packet = new PacketRiptideState(player.getEntityId(), ticks);
         CHANNEL.sendToAllTracking(packet, player);
         CHANNEL.sendTo(packet, player);
+    }
+
+    public static void sendDrownedConverting(net.minecraft.entity.EntityLivingBase entity,
+                                             boolean converting) {
+        PacketDrownedConverting packet = new PacketDrownedConverting(entity, converting);
+        CHANNEL.sendToAllTracking(packet, entity);
+        if (entity instanceof EntityPlayerMP) {
+            CHANNEL.sendTo(packet, (EntityPlayerMP) entity);
+        }
+    }
+
+    public static void sendDrownedConverting(EntityPlayerMP player,
+                                             net.minecraft.entity.EntityLivingBase entity,
+                                             boolean converting) {
+        if (converting) {
+            CHANNEL.sendTo(new PacketDrownedConverting(entity, true), player);
+        }
     }
 
     public static void sendFluidloggedChunk(EntityPlayerMP player, World world,

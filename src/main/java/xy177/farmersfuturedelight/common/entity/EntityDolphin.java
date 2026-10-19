@@ -145,7 +145,7 @@ public class EntityDolphin extends EntityAgeable implements IAnimals {
     @Override
     public void onLivingUpdate() {
         super.onLivingUpdate();
-        if (!isInsideOfMaterial(Material.WATER)) {
+        if (!FFDGameplayHooks.isSubmergedForBreathing(this, Material.WATER)) {
             setAir(MAX_AIR);
         }
         if (isWet()) {
@@ -257,7 +257,8 @@ public class EntityDolphin extends EntityAgeable implements IAnimals {
     protected void dropFewItems(boolean wasRecentlyHit, int lootingModifier) {
         int amount = rand.nextInt(2) + rand.nextInt(lootingModifier + 1);
         if (amount > 0) {
-            entityDropItem(new ItemStack(Items.FISH, amount, 0), 0.0F);
+            entityDropItem(new ItemStack(isBurning() ? Items.COOKED_FISH : Items.FISH,
+                    amount, 0), 0.0F);
         }
     }
 
@@ -395,7 +396,8 @@ public class EntityDolphin extends EntityAgeable implements IAnimals {
     }
 
     private static boolean isFish(ItemStack stack) {
-        return !stack.isEmpty() && stack.getItem() == Items.FISH;
+        return !stack.isEmpty() && (stack.getItem() == Items.FISH
+                || stack.getItem() == Items.COOKED_FISH);
     }
 
     private static boolean isWater(World world, BlockPos pos) {

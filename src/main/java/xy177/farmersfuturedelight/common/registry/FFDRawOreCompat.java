@@ -4,8 +4,12 @@ import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 
+import gnu.trove.map.TObjectFloatMap;
+import gnu.trove.map.TObjectIntMap;
 import net.minecraft.init.Blocks;
 import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
@@ -47,6 +51,12 @@ public final class FFDRawOreCompat {
         }
         if (Loader.isModLoaded("thermalexpansion")) {
             registerThermalExpansion();
+        }
+        if (Loader.isModLoaded("extrautils2")) {
+            registerExtraUtilities();
+        }
+        if (Loader.isModLoaded("actuallyadditions")) {
+            registerActuallyAdditions();
         }
         if (Loader.isModLoaded("tconstruct")) {
             registerTConstruct();
@@ -96,6 +106,189 @@ public final class FFDRawOreCompat {
         if (Loader.isModLoaded("mysticalagriculture")) {
             registerMysticalAgriculture();
         }
+    }
+
+    private static void registerExtraUtilities() {
+        try {
+            Object machine = invokeStatic(Class.forName(
+                    "com.rwtema.extrautils2.api.machine.MachineRegistry"),
+                    "getMachine", "extrautils2:crusher");
+            if (machine == null) {
+                return;
+            }
+            int added = 0;
+            for (int index = 0; index < FFDRawOres.NAMES.length; index++) {
+                if (FFDItems.isItemRegistered(FFDItems.RAW_ORE_ITEMS[index])
+                        && addExtraUtilitiesCrusherRecipe(machine,
+                                new ItemStack(FFDItems.RAW_ORE_ITEMS[index]),
+                                matchingOres(FFDRawOres.NAMES[index]))) {
+                    added++;
+                }
+            }
+            for (FFDCustomRawOres.Entry entry : FFDCustomRawOres.entries()) {
+                if (addExtraUtilitiesCrusherRecipe(machine, entry.rawStack(), entry.sourceStacks())) {
+                    added++;
+                }
+            }
+            LOGGER.debug("Registered {} Extra Utilities 2 raw-ore crusher recipes", added);
+        } catch (Throwable ignored) {
+            LOGGER.debug("Extra Utilities 2 raw-ore compatibility was unavailable", ignored);
+        }
+    }
+
+    private static boolean addExtraUtilitiesCrusherRecipe(Object machine, ItemStack raw,
+            List<ItemStack> sources) {
+        if (raw.isEmpty() || sources.isEmpty()) {
+            return false;
+        }
+        try {
+            Class<?> recipeType = Class.forName("com.rwtema.extrautils2.api.machine.IMachineRecipe");
+            Class<?> slotType = Class.forName("com.rwtema.extrautils2.api.machine.MachineSlotItem");
+            Class<?> crusherType = Class.forName("com.rwtema.extrautils2.api.machine.XUMachineCrusher");
+            Object input = staticField(crusherType, "INPUT");
+            Object output = staticField(crusherType, "OUTPUT");
+            Object registry = machine.getClass().getField("recipes_registry").get(machine);
+            Iterable<?> recipes = (Iterable<?>) registry;
+            Map<Object, Object> empty = Collections.emptyMap();
+            Method allowInput = recipeType.getMethod("allowInputItem", slotType,
+                    ItemStack.class, Map.class, Map.class);
+            for (Object recipe : recipes) {
+                if (isTrue(allowInput.invoke(recipe, input, raw, empty, empty))) {
+                    return false;
+                }
+            }
+            Method matches = recipeType.getMethod("matches", Map.class, Map.class);
+            for (ItemStack source : sources) {
+                if (source.isEmpty() || isDenseOre(source)) {
+                    continue;
+                }
+                ItemStack candidate = copyStack(source, source.getMaxStackSize());
+                Map<Object, ItemStack> inputs = Collections.singletonMap(input, candidate);
+                for (Object recipe : recipes) {
+                    candidate.setCount(source.getMaxStackSize());
+                    if (!isTrue(matches.invoke(recipe, inputs, empty))) {
+                        continue;
+                    }
+                    TObjectIntMap<?> amounts = (TObjectIntMap<?>) recipeType.getMethod(
+                            "getAmountToConsume", Map.class, Map.class).invoke(recipe, inputs, empty);
+                    int amount = amounts.get(input);
+                    if (amount <= 0 || amount > raw.getMaxStackSize()) {
+                        continue;
+                    }
+                    candidate.setCount(amount);
+                    if (!isTrue(matches.invoke(recipe, inputs, empty))) {
+                        continue;
+                    }
+                    Map<?, ?> outputs = (Map<?, ?>) recipeType.getMethod(
+                            "getItemOutputs", Map.class, Map.class).invoke(recipe, inputs, empty);
+                    Object primary = outputs.get(output);
+                    if (!(primary instanceof ItemStack) || ((ItemStack) primary).isEmpty()) {
+                        continue;
+                    }
+                    int energy = (Integer) recipeType.getMethod(
+                            "getEnergyOutput", Map.class, Map.class).invoke(recipe, inputs, empty);
+                    int time = (Integer) recipeType.getMethod(
+                            "getProcessingTime", Map.class, Map.class).invoke(recipe, inputs, empty);
+                    if (energy < 0 || time <= 0) {
+                        continue;
+                    }
+                    Map<?, ?> fluids = (Map<?, ?>) recipeType.getMethod(
+                            "getFluidOutputs", Map.class, Map.class).invoke(recipe, inputs, empty);
+                    Map<?, ?> containers = (Map<?, ?>) recipeType.getMethod(
+                            "getContainerItems", Map.class, Map.class).invoke(recipe, inputs, empty);
+                    if (!fluids.isEmpty() || containers.values().stream().anyMatch(
+                            stack -> stack instanceof ItemStack && !((ItemStack) stack).isEmpty())) {
+                        continue;
+                    }
+                    TObjectFloatMap<?> probabilities = (TObjectFloatMap<?>) recipeType.getMethod(
+                            "getProbabilityModifier", Map.class, Map.class).invoke(recipe, inputs, empty);
+                    Object builder = invokeStatic(Class.forName(
+                            "com.rwtema.extrautils2.api.machine.RecipeBuilder"), "newbuilder", machine);
+                    invoke(builder, "setItemInput", input, raw.copy(), amount);
+                    invoke(builder, "setEnergy", energy);
+                    invoke(builder, "setProcessingTime", time);
+                    for (Object slot : (List<?>) machine.getClass().getField("itemOutputs").get(machine)) {
+                        Object stack = outputs.get(slot);
+                        if (stack instanceof ItemStack && !((ItemStack) stack).isEmpty()) {
+                            invoke(builder, "setItemOutput", slot, ((ItemStack) stack).copy());
+                            if (probabilities != null && probabilities.containsKey(slot)) {
+                                invoke(builder, "setProbability", slot, probabilities.get(slot));
+                            }
+                        }
+                    }
+                    Object built = invoke(builder, "build");
+                    if (built != null) {
+                        registry.getClass().getMethod("addRecipe", recipeType).invoke(registry, built);
+                        return true;
+                    }
+                }
+            }
+        } catch (Throwable ignored) {
+            LOGGER.debug("Extra Utilities 2 crusher compatibility was unavailable for {}", raw, ignored);
+        }
+        return false;
+    }
+
+    private static void registerActuallyAdditions() {
+        try {
+            Class<?> registry = Class.forName(
+                    "de.ellpeck.actuallyadditions.mod.recipe.CrusherRecipeRegistry");
+            Class<?> api = Class.forName("de.ellpeck.actuallyadditions.api.ActuallyAdditionsAPI");
+            Method findRecipe = registry.getMethod("getRecipeFromInput", ItemStack.class);
+            Method addRecipe = api.getMethod("addCrusherRecipe", ItemStack.class,
+                    ItemStack.class, ItemStack.class, int.class);
+            int added = 0;
+            for (int index = 0; index < FFDRawOres.NAMES.length; index++) {
+                if (FFDItems.isItemRegistered(FFDItems.RAW_ORE_ITEMS[index])
+                        && addActuallyAdditionsCrusherRecipe(findRecipe, addRecipe,
+                                new ItemStack(FFDItems.RAW_ORE_ITEMS[index]),
+                                matchingOres(FFDRawOres.NAMES[index]))) {
+                    added++;
+                }
+            }
+            for (FFDCustomRawOres.Entry entry : FFDCustomRawOres.entries()) {
+                if (addActuallyAdditionsCrusherRecipe(findRecipe, addRecipe,
+                        entry.rawStack(), entry.sourceStacks())) {
+                    added++;
+                }
+            }
+            LOGGER.debug("Registered {} Actually Additions raw-ore crusher recipes", added);
+        } catch (Throwable ignored) {
+            LOGGER.debug("Actually Additions raw-ore compatibility was unavailable", ignored);
+        }
+    }
+
+    private static boolean addActuallyAdditionsCrusherRecipe(Method findRecipe, Method addRecipe,
+            ItemStack raw, List<ItemStack> sources) {
+        if (raw.isEmpty() || sources.isEmpty()) {
+            return false;
+        }
+        try {
+            if (findRecipe.invoke(null, raw) != null) {
+                return false;
+            }
+            Class<?> recipeType = Class.forName("de.ellpeck.actuallyadditions.api.recipe.CrusherRecipe");
+            for (ItemStack source : sources) {
+                if (source.isEmpty() || isDenseOre(source)) {
+                    continue;
+                }
+                Object recipe = findRecipe.invoke(null, source);
+                if (recipe == null) {
+                    continue;
+                }
+                ItemStack primary = (ItemStack) recipeType.getMethod("getOutputOne").invoke(recipe);
+                if (primary.isEmpty()) {
+                    continue;
+                }
+                ItemStack secondary = (ItemStack) recipeType.getMethod("getOutputTwo").invoke(recipe);
+                int chance = (Integer) recipeType.getMethod("getSecondChance").invoke(recipe);
+                addRecipe.invoke(null, raw.copy(), primary.copy(), secondary.copy(), chance);
+                return true;
+            }
+        } catch (Throwable ignored) {
+            LOGGER.debug("Actually Additions crusher compatibility was unavailable for {}", raw, ignored);
+        }
+        return false;
     }
 
     private static void registerIc2() {

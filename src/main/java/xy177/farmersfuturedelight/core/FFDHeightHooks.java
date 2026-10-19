@@ -425,7 +425,8 @@ public final class FFDHeightHooks {
 
     public static boolean isAreaLoaded(World world, int xStart, int yStart, int zStart,
             int xEnd, int yEnd, int zEnd, boolean allowEmpty) {
-        if (yEnd < minY(world) || yStart >= maxYExclusive(world)) {
+        int minimumY = minY(world);
+        if (yEnd < minimumY || yStart >= maxYExclusive(world)) {
             return false;
         }
         int minChunkX = xStart >> 4;
@@ -435,7 +436,7 @@ public final class FFDHeightHooks {
         BlockPos.MutableBlockPos probe = new BlockPos.MutableBlockPos();
         for (int chunkX = minChunkX; chunkX <= maxChunkX; chunkX++) {
             for (int chunkZ = minChunkZ; chunkZ <= maxChunkZ; chunkZ++) {
-                probe.setPos(chunkX << 4, minY(world), chunkZ << 4);
+                probe.setPos(chunkX << 4, minimumY, chunkZ << 4);
                 if (!world.isBlockLoaded(probe, allowEmpty)) {
                     return false;
                 }
@@ -1240,7 +1241,8 @@ public final class FFDHeightHooks {
         }
         ExtendedBlockStorage section = storage[index];
         if (section == Chunk.NULL_BLOCK_STORAGE) {
-            return world.provider.hasSkyLight() && amount < EnumSkyBlock.SKY.defaultLightValue
+            return world.provider.hasSkyLight() && chunk.canSeeSky(pos)
+                    && amount < EnumSkyBlock.SKY.defaultLightValue
                     ? EnumSkyBlock.SKY.defaultLightValue - amount : 0;
         }
         int x = pos.getX() & 15;

@@ -1,4 +1,165 @@
 {
+  "ambient.underwater.enter": {
+    "sounds": [
+      {
+        "name": "farmers_future_delight:ambient/underwater/enter1",
+        "volume": 0.5
+      },
+      {
+        "name": "farmers_future_delight:ambient/underwater/enter2",
+        "volume": 0.5
+      },
+      {
+        "name": "farmers_future_delight:ambient/underwater/enter3",
+        "volume": 0.5
+      }
+    ]
+  },
+  "ambient.underwater.exit": {
+    "sounds": [
+      {
+        "name": "farmers_future_delight:ambient/underwater/exit1",
+        "volume": 0.3
+      },
+      {
+        "name": "farmers_future_delight:ambient/underwater/exit2",
+        "volume": 0.3
+      },
+      {
+        "name": "farmers_future_delight:ambient/underwater/exit3",
+        "volume": 0.3
+      }
+    ]
+  },
+  "ambient.underwater.loop": {
+    "sounds": [
+      {
+        "name": "farmers_future_delight:ambient/underwater/underwater_ambience",
+        "stream": true,
+        "volume": 0.65
+      }
+    ]
+  },
+  "ambient.underwater.loop.additions": {
+    "sounds": [
+      "farmers_future_delight:ambient/underwater/additions/bubbles1",
+      "farmers_future_delight:ambient/underwater/additions/bubbles2",
+      "farmers_future_delight:ambient/underwater/additions/bubbles3",
+      "farmers_future_delight:ambient/underwater/additions/bubbles4",
+      "farmers_future_delight:ambient/underwater/additions/bubbles5",
+      "farmers_future_delight:ambient/underwater/additions/bubbles6",
+      "farmers_future_delight:ambient/underwater/additions/water1",
+      "farmers_future_delight:ambient/underwater/additions/water2"
+    ]
+  },
+  "ambient.underwater.loop.additions.rare": {
+    "sounds": [
+      "farmers_future_delight:ambient/underwater/additions/animal1",
+      {
+        "name": "farmers_future_delight:ambient/underwater/additions/bass_whale1",
+        "volume": 0.45
+      },
+      {
+        "name": "farmers_future_delight:ambient/underwater/additions/bass_whale2",
+        "volume": 0.5
+      },
+      {
+        "name": "farmers_future_delight:ambient/underwater/additions/crackles1",
+        "volume": 0.7
+      },
+      "farmers_future_delight:ambient/underwater/additions/crackles2",
+      {
+        "name": "farmers_future_delight:ambient/underwater/additions/driplets1",
+        "volume": 0.5
+      },
+      {
+        "name": "farmers_future_delight:ambient/underwater/additions/driplets2",
+        "volume": 0.5
+      },
+      "farmers_future_delight:ambient/underwater/additions/earth_crack"
+    ]
+  },
+  "ambient.underwater.loop.additions.ultra_rare": {
+    "sounds": [
+      "farmers_future_delight:ambient/underwater/additions/animal2",
+      "farmers_future_delight:ambient/underwater/additions/dark1",
+      {
+        "name": "farmers_future_delight:ambient/underwater/additions/dark2",
+        "volume": 0.7
+      },
+      "farmers_future_delight:ambient/underwater/additions/dark3",
+      "farmers_future_delight:ambient/underwater/additions/dark4"
+    ]
+  },
+  "entity.player.splash": {
+    "sounds": [
+      "farmers_future_delight:liquid/splash",
+      "farmers_future_delight:liquid/splash2"
+    ],
+    "subtitle": "subtitles.entity.generic.splash"
+  },
+  "entity.player.splash.high_speed": {
+    "sounds": [
+      "farmers_future_delight:liquid/heavy_splash"
+    ],
+    "subtitle": "subtitles.entity.generic.splash"
+  },
+  "entity.player.swim": {
+    "sounds": [
+      "farmers_future_delight:liquid/swim5",
+      "farmers_future_delight:liquid/swim6",
+      "farmers_future_delight:liquid/swim7",
+      "farmers_future_delight:liquid/swim8",
+      "farmers_future_delight:liquid/swim9",
+      "farmers_future_delight:liquid/swim10",
+      "farmers_future_delight:liquid/swim11",
+      "farmers_future_delight:liquid/swim12",
+      "farmers_future_delight:liquid/swim13",
+      "farmers_future_delight:liquid/swim14",
+      "farmers_future_delight:liquid/swim15",
+      "farmers_future_delight:liquid/swim16",
+      "farmers_future_delight:liquid/swim17",
+      "farmers_future_delight:liquid/swim18"
+    ],
+    "subtitle": "subtitles.entity.generic.swim"
+  },
+    "item.glow_ink_sac.use": {
+        "sounds": [
+            "farmers_future_delight:item/ink_sac/ink_sac1",
+            { "name": "farmers_future_delight:item/ink_sac/ink_sac1", "pitch": 0.95 },
+            { "name": "farmers_future_delight:item/ink_sac/ink_sac1", "pitch": 1.05 },
+            "farmers_future_delight:item/ink_sac/ink_sac2",
+            { "name": "farmers_future_delight:item/ink_sac/ink_sac2", "pitch": 0.95 },
+            { "name": "farmers_future_delight:item/ink_sac/ink_sac2", "pitch": 1.05 },
+            "farmers_future_delight:item/ink_sac/ink_sac3",
+            { "name": "farmers_future_delight:item/ink_sac/ink_sac3", "pitch": 0.95 },
+            { "name": "farmers_future_delight:item/ink_sac/ink_sac3", "pitch": 1.05 }
+        ],
+        "subtitle": "subtitles.item.glow_ink_sac.use"
+    },
+    "item.ink_sac.use": {
+        "sounds": [
+            { "name": "farmers_future_delight:item/ink_sac/ink_sac1", "pitch": 0.85 },
+            { "name": "farmers_future_delight:item/ink_sac/ink_sac1", "pitch": 0.88 },
+            { "name": "farmers_future_delight:item/ink_sac/ink_sac1", "pitch": 0.9 },
+            { "name": "farmers_future_delight:item/ink_sac/ink_sac2", "pitch": 0.85 },
+            { "name": "farmers_future_delight:item/ink_sac/ink_sac2", "pitch": 0.88 },
+            { "name": "farmers_future_delight:item/ink_sac/ink_sac2", "pitch": 0.9 },
+            { "name": "farmers_future_delight:item/ink_sac/ink_sac3", "pitch": 0.85 },
+            { "name": "farmers_future_delight:item/ink_sac/ink_sac3", "pitch": 0.88 },
+            { "name": "farmers_future_delight:item/ink_sac/ink_sac3", "pitch": 0.9 }
+        ],
+        "subtitle": "subtitles.item.ink_sac.use"
+    },
+    "item.dye.use": {
+        "sounds": [
+            "farmers_future_delight:item/dye/dye",
+            { "name": "farmers_future_delight:item/dye/dye", "pitch": 0.9 },
+            { "name": "farmers_future_delight:item/dye/dye", "pitch": 0.95 },
+            { "name": "farmers_future_delight:item/dye/dye", "pitch": 1.1 }
+        ],
+        "subtitle": "subtitles.item.dye.use"
+    },
     "music.caves_and_cliffs": {
         "sounds": []
     },

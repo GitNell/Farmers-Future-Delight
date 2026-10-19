@@ -30,6 +30,19 @@ public final class FFDCoreCompat {
         return CAVES_NOT_CLIFFS_PRESENT;
     }
 
+    public static boolean isFutureMcCorePresent() {
+        return detect("thedarkcolour/futuremc/asm/CoreTransformer.class");
+    }
+
+    public static boolean isFluidloggedRendererPluginPresent() {
+        return detect("git/jbredwards/fluidlogged_api/mod/asm/plugins/vanilla/client/"
+                + "PluginBlockFluidRenderer.class");
+    }
+
+    public static boolean isFutureMcBlockOutlinePresent() {
+        return isFutureMcCorePresent() && !detect("org/vivecraft/main/VivecraftMain.class");
+    }
+
     public static void validateCaveBiomesHeightRange(int expectedMinY, int expectedMaxY) {
         if (!CAVE_BIOMES_API_PRESENT) {
             return;

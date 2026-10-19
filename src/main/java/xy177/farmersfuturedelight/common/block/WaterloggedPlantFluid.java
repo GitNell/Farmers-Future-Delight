@@ -42,6 +42,8 @@ public final class WaterloggedPlantFluid {
     private static Field quantaPerBlockField;
     private static boolean quantaPerBlockFieldResolved;
     private static final List<WaterloggedBlockApi.Adapter> ADAPTERS = new ArrayList<>();
+    private static volatile WaterloggedBlockApi.Adapter[] adapterSnapshot =
+            new WaterloggedBlockApi.Adapter[0];
     private static final List<WaterloggedBlockApi.FluidMixRule> FLUID_MIX_RULES = new ArrayList<>();
     private static final ThreadLocal<Boolean> IN_ADAPTER_CALLBACK = new ThreadLocal<>();
     private static final ThreadLocal<Integer> WORLDGEN_DEPTH = new ThreadLocal<>();
@@ -80,11 +82,14 @@ public final class WaterloggedPlantFluid {
     public static synchronized void registerAdapter(WaterloggedBlockApi.Adapter adapter) {
         if (adapter != null && !ADAPTERS.contains(adapter)) {
             ADAPTERS.add(adapter);
+            adapterSnapshot = ADAPTERS.toArray(new WaterloggedBlockApi.Adapter[0]);
         }
     }
 
     public static synchronized void unregisterAdapter(WaterloggedBlockApi.Adapter adapter) {
-        ADAPTERS.remove(adapter);
+        if (ADAPTERS.remove(adapter)) {
+            adapterSnapshot = ADAPTERS.toArray(new WaterloggedBlockApi.Adapter[0]);
+        }
     }
 
     public static synchronized void registerFluidMixRule(WaterloggedBlockApi.FluidMixRule rule) {
@@ -156,10 +161,11 @@ public final class WaterloggedPlantFluid {
         if (block instanceof IWaterloggableBlock) {
             return ((IWaterloggableBlock) block).isWaterloggedState(state);
         }
-        if (!FFDConfig.isWaterloggingEnabled()) {
+        boolean universal = WaterloggedBlockApi.hasUniversalWaterloggedProperty(state);
+        if ((!universal && adapterSnapshot.length == 0) || !FFDConfig.isWaterloggingEnabled()) {
             return false;
         }
-        if (WaterloggedBlockApi.hasUniversalWaterloggedProperty(state)) {
+        if (universal) {
             return state.getValue(WaterloggedBlockApi.UNIVERSAL_WATERLOGGED);
         }
         return adapterIsWaterlogged(state);
@@ -538,12 +544,9 @@ public final class WaterloggedPlantFluid {
         if (WaterloggedBlockApi.hasUniversalWaterloggedProperty(state)) {
             return state.withProperty(WaterloggedBlockApi.UNIVERSAL_WATERLOGGED, waterlogged);
         }
-        if (Boolean.TRUE.equals(IN_ADAPTER_CALLBACK.get())) {
+        WaterloggedBlockApi.Adapter[] adapters = adapterSnapshot;
+        if (adapters.length == 0 || Boolean.TRUE.equals(IN_ADAPTER_CALLBACK.get())) {
             return null;
-        }
-        List<WaterloggedBlockApi.Adapter> adapters;
-        synchronized (WaterloggedPlantFluid.class) {
-            adapters = new ArrayList<>(ADAPTERS);
         }
         IN_ADAPTER_CALLBACK.set(true);
         try {
@@ -559,12 +562,9 @@ public final class WaterloggedPlantFluid {
     }
 
     private static boolean adapterIsWaterlogged(IBlockState state) {
-        if (Boolean.TRUE.equals(IN_ADAPTER_CALLBACK.get())) {
+        WaterloggedBlockApi.Adapter[] adapters = adapterSnapshot;
+        if (adapters.length == 0 || Boolean.TRUE.equals(IN_ADAPTER_CALLBACK.get())) {
             return false;
-        }
-        List<WaterloggedBlockApi.Adapter> adapters;
-        synchronized (WaterloggedPlantFluid.class) {
-            adapters = new ArrayList<>(ADAPTERS);
         }
         IN_ADAPTER_CALLBACK.set(true);
         try {

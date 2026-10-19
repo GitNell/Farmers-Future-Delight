@@ -9,6 +9,7 @@ import net.minecraft.block.Block;
 import net.minecraft.block.state.IBlockState;
 import net.minecraft.enchantment.Enchantment;
 import net.minecraft.item.Item;
+import net.minecraft.item.ItemMonsterPlacer;
 import net.minecraft.item.ItemStack;
 import net.minecraft.util.ResourceLocation;
 import net.minecraft.world.biome.Biome;
@@ -312,6 +313,8 @@ public final class FFDCompat {
         AQUATIC_DECOR(
                 blocks("Future MC", "futuremc", "blue_ice",
                         "bubble_column",
+                        "oak_wood", "spruce_wood", "birch_wood",
+                        "jungle_wood", "acacia_wood", "dark_oak_wood",
                         "stripped_oak_log", "stripped_spruce_log", "stripped_birch_log",
                         "stripped_jungle_log", "stripped_acacia_log", "stripped_dark_oak_log",
                         "stripped_oak_wood", "stripped_spruce_wood", "stripped_birch_wood",
@@ -322,6 +325,8 @@ public final class FFDCompat {
                         "prismarine_double_slab", "prismarine_brick_double_slab",
                         "dark_prismarine_double_slab"),
                 items("Future MC", "futuremc", "blue_ice",
+                        "oak_wood", "spruce_wood", "birch_wood",
+                        "jungle_wood", "acacia_wood", "dark_oak_wood",
                         "stripped_oak_log", "stripped_spruce_log", "stripped_birch_log",
                         "stripped_jungle_log", "stripped_acacia_log", "stripped_dark_oak_log",
                         "stripped_oak_wood", "stripped_spruce_wood", "stripped_birch_wood",
@@ -337,9 +342,12 @@ public final class FFDCompat {
                                 "tropical_fish_bucket"),
                         ids("futuremc", "cod", "salmon", "pufferfish", "tropical_fish")),
                 content("Oceanic Expanse", null,
-                        ids("oe", "cod_bucket", "salmon_bucket", "pufferfish_bucket",
-                                "tropical_fish_bucket"),
-                        ids("oe", "cod", "salmon", "pufferfish", "tropical_fish"))),
+                        null, ids("oe", "cod", "salmon", "pufferfish", "tropical_fish"),
+                        null, new ContentVariant[] {
+                                oceanicExpanseFishBucket("cod"),
+                                oceanicExpanseFishBucket("salmon"),
+                                oceanicExpanseFishBucket("pufferfish"),
+                                oceanicExpanseFishBucket("tropical_fish")})),
         DOLPHIN(
                 contentWithLocalPaths("Oceanic Expanse", null, null,
                         ids("oe", "dolphin"), null, null,
@@ -557,6 +565,11 @@ public final class FFDCompat {
     private static ContentVariant variant(String path, String namespace,
                                           String registryPath, int metadata) {
         return new ContentVariant(path, namespace + ':' + registryPath, metadata);
+    }
+
+    private static ContentVariant oceanicExpanseFishBucket(String entityPath) {
+        return new ContentVariant(entityPath + "_bucket", "oe:spawn_bucket", 0,
+                "oe:" + entityPath);
     }
 
     private static ProviderSet oceanicExpanseCoral() {
@@ -1237,8 +1250,7 @@ public final class FFDCompat {
                 return;
             }
             for (String path : localPaths) {
-                entries.add(path + "@" + namespace + "="
-                        + defaultAutoCompatibilityEnabled(path, namespace));
+                entries.add(path + "@" + namespace + "=true");
             }
         }
 
@@ -1252,14 +1264,14 @@ public final class FFDCompat {
             }
         }
         for (String material : FFDRawOres.NAMES) {
-            entries.add(FFDRawOres.rawItemName(material) + "@suikerawore=false");
-            entries.add(FFDRawOres.rawBlockName(material) + "@suikerawore=false");
+            entries.add(FFDRawOres.rawItemName(material) + "@suikerawore=true");
+            entries.add(FFDRawOres.rawBlockName(material) + "@suikerawore=true");
         }
-        entries.add("slow_falling@phantoms=false");
-        entries.add("crimson_forest@nb=false");
-        entries.add("warped_forest@nb=false");
-        entries.add("crimson_forest@netherized=false");
-        entries.add("warped_forest@netherized=false");
+        entries.add("slow_falling@phantoms=true");
+        entries.add("crimson_forest@nb=true");
+        entries.add("warped_forest@nb=true");
+        entries.add("crimson_forest@netherized=true");
+        entries.add("warped_forest@netherized=true");
         entries.add("shipwreck@oe=true");
         return entries.toArray(new String[0]);
     }
@@ -1290,51 +1302,6 @@ public final class FFDCompat {
         } catch (Throwable ignored) {
             return false;
         }
-    }
-
-    private static boolean defaultAutoCompatibilityEnabled(String path, String namespace) {
-        if ("fd".equals(namespace) || "da".equals(namespace)
-                || "depthsupdate".equals(namespace)
-                || "cavesnotcliffs".equals(namespace) || "phantoms".equals(namespace)
-                || "suikerawore".equals(namespace) || "nb".equals(namespace)
-                || "netherized".equals(namespace)) {
-            return false;
-        }
-        if ("futuremc".equals(namespace) && "bee".equals(path)) {
-            return false;
-        }
-        if ("deeperdepths".equals(namespace)) {
-            return !isDeeperDepthsFfdPreferred(path);
-        }
-        return true;
-    }
-
-    private static boolean isDeeperDepthsFfdPreferred(String path) {
-        if ("tuff".equals(path) || "deepslate".equals(path)
-                || "cobbled_deepslate".equals(path) || "chiseled_deepslate".equals(path)
-                || "polished_deepslate".equals(path) || "deepslate_bricks".equals(path)
-                || "cracked_deepslate_bricks".equals(path) || "deepslate_tiles".equals(path)
-                || "cracked_deepslate_tiles".equals(path) || "infested_deepslate".equals(path)
-                || "cobbled_deepslate_stairs".equals(path)
-                || "polished_deepslate_stairs".equals(path)
-                || "deepslate_brick_stairs".equals(path)
-                || "deepslate_tile_stairs".equals(path)
-                || "cobbled_deepslate_slab".equals(path)
-                || "cobbled_deepslate_double_slab".equals(path)
-                || "polished_deepslate_slab".equals(path)
-                || "polished_deepslate_double_slab".equals(path)
-                || "deepslate_brick_slab".equals(path)
-                || "deepslate_brick_double_slab".equals(path)
-                || "deepslate_tile_slab".equals(path)
-                || "deepslate_tile_double_slab".equals(path)
-                || "cobbled_deepslate_wall".equals(path)
-                || "polished_deepslate_wall".equals(path)
-                || "deepslate_brick_wall".equals(path)
-                || "deepslate_tile_wall".equals(path)) {
-            return true;
-        }
-        return "candle".equals(path) || path.endsWith("_candle")
-                || "candle_cake".equals(path) || path.endsWith("_candle_cake");
     }
 
     private static IBlockState findRegisteredBlockVariant(ContentVariant[] variants,
@@ -1373,7 +1340,16 @@ public final class FFDCompat {
                 item = findPendingItem(key);
             }
             if (item != null && key.equals(item.getRegistryName())) {
-                return new ItemStack(item, 1, variant.metadata);
+                ItemStack stack = new ItemStack(item, 1, variant.metadata);
+                if (variant.entityRegistryName != null) {
+                    ResourceLocation entityKey = new ResourceLocation(variant.entityRegistryName);
+                    if (!(item instanceof ItemMonsterPlacer)
+                            || !ForgeRegistries.ENTITIES.containsKey(entityKey)) {
+                        continue;
+                    }
+                    ItemMonsterPlacer.applyEntityIdToItemStack(stack, entityKey);
+                }
+                return stack;
             }
         }
         return ItemStack.EMPTY;
@@ -1644,11 +1620,18 @@ public final class FFDCompat {
         private final String path;
         private final String registryName;
         private final int metadata;
+        private final String entityRegistryName;
 
         private ContentVariant(String path, String registryName, int metadata) {
+            this(path, registryName, metadata, null);
+        }
+
+        private ContentVariant(String path, String registryName, int metadata,
+                               String entityRegistryName) {
             this.path = path;
             this.registryName = registryName;
             this.metadata = metadata;
+            this.entityRegistryName = entityRegistryName;
         }
     }
 

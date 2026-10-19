@@ -15,6 +15,7 @@ import net.minecraft.util.ResourceLocation;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.lwjgl.util.glu.Project;
+import org.lwjgl.opengl.GL11;
 import xy177.farmersfuturedelight.FarmerFutureDelight;
 
 final class FFDLoadingPanoramaRenderer {
@@ -37,10 +38,14 @@ final class FFDLoadingPanoramaRenderer {
     private int blurHeight = -1;
     private boolean blurUnavailable;
     private long lastTime = -1L;
-    private float rotation;
+    private static float rotation;
 
     void render(Minecraft minecraft, int width, int height, Framebuffer target) {
         advanceRotation();
+        GlStateManager.enableTexture2D();
+        GlStateManager.disableLighting();
+        GlStateManager.disableFog();
+        GlStateManager.color(1.0F, 1.0F, 1.0F, 1.0F);
         GlStateManager.viewport(0, 0, target.framebufferWidth, target.framebufferHeight);
         drawCube(minecraft, target.framebufferWidth, target.framebufferHeight);
         setupGuiProjection(width, height);
@@ -48,6 +53,18 @@ final class FFDLoadingPanoramaRenderer {
         applyBlur(minecraft, target);
         setupGuiProjection(width, height);
         Gui.drawRect(0, 0, width, height, 0x40000000);
+        GlStateManager.enableAlpha();
+        GlStateManager.color(1.0F, 1.0F, 1.0F, 1.0F);
+    }
+
+    void close() {
+        if (blurShader != null) {
+            blurShader.deleteShaderGroup();
+            blurShader = null;
+        }
+        blurTarget = null;
+        blurWidth = -1;
+        blurHeight = -1;
     }
 
     private void advanceRotation() {
@@ -163,8 +180,8 @@ final class FFDLoadingPanoramaRenderer {
         GlStateManager.enableBlend();
         GlStateManager.color(1.0F, 1.0F, 1.0F, 1.0F);
         minecraft.getTextureManager().bindTexture(PANORAMA_OVERLAY);
-        Gui.drawScaledCustomSizeModalRect(0, 0, 0.0F, 0.0F, 1, 1,
-                width, height, 1.0F, 1.0F);
+        Gui.drawScaledCustomSizeModalRect(0, 0, 0.0F, 0.0F, 16, 128,
+                width, height, 16.0F, 128.0F);
         GlStateManager.disableBlend();
     }
 
@@ -173,6 +190,11 @@ final class FFDLoadingPanoramaRenderer {
                 || !OpenGlHelper.areShadersSupported()) {
             return;
         }
+        int previousFilter = target.framebufferFilter;
+        GlStateManager.bindTexture(target.framebufferTexture);
+        int previousWrapS = GL11.glGetTexParameteri(3553, 10242);
+        int previousWrapT = GL11.glGetTexParameteri(3553, 10243);
+        GlStateManager.bindTexture(0);
         try {
             if (blurShader == null || blurTarget != target) {
                 if (blurShader != null) {
@@ -189,15 +211,31 @@ final class FFDLoadingPanoramaRenderer {
                 blurWidth = target.framebufferWidth;
                 blurHeight = target.framebufferHeight;
                 blurShader.createBindFramebuffers(blurWidth, blurHeight);
+                configureBlurFramebuffer(blurShader.getFramebufferRaw("swap"));
             }
+            configureBlurFramebuffer(target);
             blurShader.render(0.0F);
-            target.bindFramebuffer(false);
-            GlStateManager.viewport(0, 0, target.framebufferWidth, target.framebufferHeight);
-        } catch (IOException exception) {
+        } catch (IOException | RuntimeException exception) {
             blurUnavailable = true;
             LOGGER.warn("Unable to initialize the modern loading-screen blur", exception);
+            close();
+        } finally {
+            target.setFramebufferFilter(previousFilter);
+            GlStateManager.bindTexture(target.framebufferTexture);
+            GlStateManager.glTexParameteri(3553, 10242, previousWrapS);
+            GlStateManager.glTexParameteri(3553, 10243, previousWrapT);
+            GlStateManager.bindTexture(0);
             target.bindFramebuffer(false);
+            GlStateManager.viewport(0, 0, target.framebufferWidth, target.framebufferHeight);
         }
+    }
+
+    private static void configureBlurFramebuffer(Framebuffer framebuffer) {
+        framebuffer.setFramebufferFilter(9729);
+        GlStateManager.bindTexture(framebuffer.framebufferTexture);
+        GlStateManager.glTexParameteri(3553, 10242, 33071);
+        GlStateManager.glTexParameteri(3553, 10243, 33071);
+        GlStateManager.bindTexture(0);
     }
 
     private static void setupGuiProjection(int width, int height) {

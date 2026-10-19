@@ -58,6 +58,7 @@ import xy177.farmersfuturedelight.common.block.BlockPowderSnow;
 import xy177.farmersfuturedelight.common.block.BlockLightningRod;
 import xy177.farmersfuturedelight.common.block.BlockAbstractCandle;
 import xy177.farmersfuturedelight.api.WaterloggedBlockApi;
+import xy177.farmersfuturedelight.common.fluid.FFDStoredFluidStates;
 import xy177.farmersfuturedelight.common.registry.FFDBlocks;
 import xy177.farmersfuturedelight.common.registry.FFDItems;
 import xy177.farmersfuturedelight.common.registry.FFDPotions;
@@ -77,6 +78,11 @@ public final class FFDGameplayHooks {
     private static boolean entityFlagsResolved;
 
     private FFDGameplayHooks() {
+    }
+
+    public static boolean cannotBePickedUpByBoat(Entity entity) {
+        return entity instanceof net.minecraft.entity.passive.EntityWaterMob
+                || entity instanceof xy177.farmersfuturedelight.common.entity.EntityDolphin;
     }
 
     public static int biomeCreatureTypeSwitch(int[] switchTable, int ordinal) {
@@ -101,6 +107,20 @@ public final class FFDGameplayHooks {
         return "sweetBerryBush".equals(source.damageType)
                 ? FFDSounds.PLAYER_HURT_SWEET_BERRY_BUSH
                 : original;
+    }
+
+    public static SoundEvent playerSwimSound(SoundEvent original) {
+        return FFDSounds.PLAYER_SWIM;
+    }
+
+    public static SoundEvent playerSplashSound(SoundEvent original, EntityPlayer player) {
+        Entity passenger = player.getControllingPassenger();
+        Entity moving = player.isBeingRidden() && passenger != null ? passenger : player;
+        float multiplier = moving == player ? 0.2F : 0.9F;
+        float volume = Math.min(1.0F, MathHelper.sqrt(moving.motionX * moving.motionX * (double) 0.2F
+                + moving.motionY * moving.motionY
+                + moving.motionZ * moving.motionZ * (double) 0.2F) * multiplier);
+        return volume < 0.25F ? FFDSounds.PLAYER_SPLASH : FFDSounds.PLAYER_SPLASH_HIGH_SPEED;
     }
 
     public static byte sweetBerryHurtStatus(byte status, EntityLivingBase entity,
@@ -348,6 +368,12 @@ public final class FFDGameplayHooks {
         return wetState == null ? placedState : wetState;
     }
 
+    public static boolean removeWaterloggedBlockByPlayer(World world, BlockPos pos,
+                                                         IBlockState removedState) {
+        return setBlockStateAfterRemoval(world, pos, Blocks.AIR.getDefaultState(),
+                world.isRemote ? 11 : 3, removedState);
+    }
+
     public static boolean setBlockStateAfterRemoval(World world, BlockPos pos,
                                                      IBlockState replacement, int flags,
                                                      IBlockState removedState) {
@@ -412,6 +438,32 @@ public final class FFDGameplayHooks {
             return Integer.valueOf(0);
         }
         return state.getValue(property);
+    }
+
+    public static IBlockState fluidloggedApiFluidState(IBlockState state) {
+        if (state != null && state.getMaterial() == Material.WATER
+                && state.getBlock() instanceof xy177.farmersfuturedelight.api.IWaterloggableBlock
+                && ((xy177.farmersfuturedelight.api.IWaterloggableBlock) state.getBlock())
+                        .isWaterloggedState(state)) {
+            return Blocks.WATER.getDefaultState();
+        }
+        return state;
+    }
+
+    public static Block snowCoverBlock(Block block) {
+        return block instanceof BlockPowderSnow ? Blocks.SNOW : block;
+    }
+
+    public static IBlockState farmlandFluidState(IBlockAccess world, BlockPos pos, IBlockState state) {
+        if (world instanceof World && !((World) world).isBlockLoaded(pos)) {
+            return state;
+        }
+        IBlockState stored = FFDStoredFluidStates.get(world, pos);
+        if (stored != null) {
+            return stored;
+        }
+        return WaterloggedBlockApi.isWaterlogged(state)
+                ? WaterloggedBlockApi.getFluidState(world, pos) : state;
     }
 
     public static boolean isWaterloggedStateForLiquid(IBlockState state) {
@@ -484,7 +536,10 @@ public final class FFDGameplayHooks {
 
     public static int getFluidloggedLightValue(Block block, IBlockState state,
                                                 IBlockAccess world, BlockPos pos) {
-        int light = block.getLightValue(state, world, pos);
+        return getFluidloggedLightValue(block.getLightValue(state, world, pos), world, pos);
+    }
+
+    public static int getFluidloggedLightValue(int light, IBlockAccess world, BlockPos pos) {
         if (!WaterloggedBlockApi.isWaterlogged(world, pos) || !(world instanceof World)) {
             return light;
         }
@@ -526,6 +581,33 @@ public final class FFDGameplayHooks {
                         && (FFDPotions.hasConduitPower(entity)
                                 || FFDConfig.isConfiguredEntity(FFDConfig.waterDrowningImmuneMobs,
                                         entity)));
+    }
+
+    public static boolean isSubmergedForBreathing(EntityLivingBase entity, Material material) {
+        return entity.isInsideOfMaterial(material)
+                && (material != Material.WATER || !isInBubbleColumn(entity));
+    }
+
+    private static boolean isInBubbleColumn(EntityLivingBase entity) {
+        return entity.world.getBlockState(new BlockPos(entity.posX,
+                entity.posY + entity.getEyeHeight(), entity.posZ)).getBlock() == FFDBlocks.BUBBLE_COLUMN;
+    }
+
+    public static int recoverAirSupply(int original, EntityLivingBase entity) {
+        return entity instanceof EntityPlayer && (isSwimmingSystemEnabled() || isInBubbleColumn(entity))
+                ? Math.min(original, entity.getAir() + 4) : original;
+    }
+
+    public static boolean updateBreathingInWater(boolean submerged, EntityLivingBase entity) {
+        if (submerged && isInBubbleColumn(entity)) {
+            return false;
+        }
+        if (submerged && entity instanceof EntityPlayer && entity.isEntityAlive() && entity.getAir() < 300
+                && (((EntityPlayer) entity).capabilities.disableDamage
+                        || hasWaterBreathingOrConduit(entity, MobEffects.WATER_BREATHING))) {
+            entity.setAir(Math.min(300, entity.getAir() + 4));
+        }
+        return submerged;
     }
 
     public static Material blockReplacementMaterial(IBlockState state) {

@@ -36,14 +36,18 @@ import xy177.farmersfuturedelight.common.block.WaterloggedPlantFluid;
 public final class WaterloggedPlantBakedModel implements IBakedModel {
     public static final int FLUID_TINT_INDEX = 0x464644;
     private static final float SOURCE_WATER_SURFACE = 16.0F * (8.0F / 9.0F - 0.001F);
-    private static final float FULL_WATER_SURFACE = 16.0F * (1.0F - 0.001F);
-    private static final float SIDE_INSET = 0.002F;
+    private static final float FULL_WATER_SURFACE = 16.0F;
+    private static final float SIDE_INSET = 0.001F;
 
     private final IBakedModel plantModel;
     private volatile WaterQuadCache waterQuadCache;
 
     public WaterloggedPlantBakedModel(IBakedModel plantModel) {
         this.plantModel = plantModel;
+    }
+
+    public IBakedModel getPlantModel() {
+        return plantModel;
     }
 
     @Override
@@ -214,7 +218,8 @@ public final class WaterloggedPlantBakedModel implements IBakedModel {
         if (state instanceof IExtendedBlockState) {
             Float value = ((IExtendedBlockState) state).getValue(property);
             if (value != null) {
-                return Math.max(0.0F, Math.min(1.0F, value - 0.001F));
+                return Math.max(0.0F, Math.min(1.0F,
+                        value - (hasWaterAbove(state) ? 0.0F : 0.001F)));
             }
         }
         return fallback;
@@ -290,38 +295,38 @@ public final class WaterloggedPlantBakedModel implements IBakedModel {
             quads.put(EnumFacing.DOWN, Collections.<BakedQuad>emptyList());
         }
         if (northVisible) {
-            quads.put(EnumFacing.NORTH, Collections.singletonList(createQuad(format, EnumFacing.NORTH, flowingFluid,
-                    vertex(x0, y0, northZ, 0.0F, 16.0F),
-                    vertex(x0, northWest - offsetY, northZ, 0.0F, 0.0F),
-                    vertex(x1, northEast - offsetY, northZ, 16.0F, 0.0F),
-                    vertex(x1, y0, northZ, 16.0F, 16.0F))));
+            quads.put(EnumFacing.NORTH, createSideQuads(format, EnumFacing.NORTH, flowingFluid,
+                    vertex(x0, y0, northZ, 0.0F, 8.0F),
+                    vertex(x0, northWest - offsetY, northZ, 0.0F, (1.0F - northWest) * 8.0F),
+                    vertex(x1, northEast - offsetY, northZ, 8.0F, (1.0F - northEast) * 8.0F),
+                    vertex(x1, y0, northZ, 8.0F, 8.0F)));
         } else {
             quads.put(EnumFacing.NORTH, Collections.<BakedQuad>emptyList());
         }
         if (southVisible) {
-            quads.put(EnumFacing.SOUTH, Collections.singletonList(createQuad(format, EnumFacing.SOUTH, flowingFluid,
-                    vertex(x0, y0, southZ, 16.0F, 16.0F),
-                    vertex(x1, y0, southZ, 0.0F, 16.0F),
-                    vertex(x1, southEast - offsetY, southZ, 0.0F, 0.0F),
-                    vertex(x0, southWest - offsetY, southZ, 16.0F, 0.0F))));
+            quads.put(EnumFacing.SOUTH, createSideQuads(format, EnumFacing.SOUTH, flowingFluid,
+                    vertex(x0, y0, southZ, 8.0F, 8.0F),
+                    vertex(x1, y0, southZ, 0.0F, 8.0F),
+                    vertex(x1, southEast - offsetY, southZ, 0.0F, (1.0F - southEast) * 8.0F),
+                    vertex(x0, southWest - offsetY, southZ, 8.0F, (1.0F - southWest) * 8.0F)));
         } else {
             quads.put(EnumFacing.SOUTH, Collections.<BakedQuad>emptyList());
         }
         if (westVisible) {
-            quads.put(EnumFacing.WEST, Collections.singletonList(createQuad(format, EnumFacing.WEST, flowingFluid,
-                    vertex(westX, y0, z0, 16.0F, 16.0F),
-                    vertex(westX, y0, z1, 0.0F, 16.0F),
-                    vertex(westX, southWest - offsetY, z1, 0.0F, 0.0F),
-                    vertex(westX, northWest - offsetY, z0, 16.0F, 0.0F))));
+            quads.put(EnumFacing.WEST, createSideQuads(format, EnumFacing.WEST, flowingFluid,
+                    vertex(westX, y0, z0, 8.0F, 8.0F),
+                    vertex(westX, y0, z1, 0.0F, 8.0F),
+                    vertex(westX, southWest - offsetY, z1, 0.0F, (1.0F - southWest) * 8.0F),
+                    vertex(westX, northWest - offsetY, z0, 8.0F, (1.0F - northWest) * 8.0F)));
         } else {
             quads.put(EnumFacing.WEST, Collections.<BakedQuad>emptyList());
         }
         if (eastVisible) {
-            quads.put(EnumFacing.EAST, Collections.singletonList(createQuad(format, EnumFacing.EAST, flowingFluid,
-                    vertex(eastX, y0, z0, 0.0F, 16.0F),
-                    vertex(eastX, northEast - offsetY, z0, 0.0F, 0.0F),
-                    vertex(eastX, southEast - offsetY, z1, 16.0F, 0.0F),
-                    vertex(eastX, y0, z1, 16.0F, 16.0F))));
+            quads.put(EnumFacing.EAST, createSideQuads(format, EnumFacing.EAST, flowingFluid,
+                    vertex(eastX, y0, z0, 0.0F, 8.0F),
+                    vertex(eastX, northEast - offsetY, z0, 0.0F, (1.0F - northEast) * 8.0F),
+                    vertex(eastX, southEast - offsetY, z1, 8.0F, (1.0F - southEast) * 8.0F),
+                    vertex(eastX, y0, z1, 8.0F, 8.0F)));
         } else {
             quads.put(EnumFacing.EAST, Collections.<BakedQuad>emptyList());
         }
@@ -330,6 +335,12 @@ public final class WaterloggedPlantBakedModel implements IBakedModel {
 
     private static Vertex vertex(float x, float y, float z, float u, float v) {
         return new Vertex(x, y, z, u, v);
+    }
+
+    private static List<BakedQuad> createSideQuads(VertexFormat format, EnumFacing face,
+            TextureAtlasSprite texture, Vertex first, Vertex second, Vertex third, Vertex fourth) {
+        return Arrays.asList(createQuad(format, face, texture, first, second, third, fourth),
+                createQuad(format, face.getOpposite(), texture, fourth, third, second, first));
     }
 
     private static BakedQuad createQuad(VertexFormat format, EnumFacing face, TextureAtlasSprite texture,

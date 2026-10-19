@@ -15,10 +15,10 @@ public final class FFDVerticalBiomeZoomer {
 
     public static FFDVerticalBiome getBiome(long zoomSeed, int blockX, int blockY, int blockZ,
                                              Source source) {
-        long quart = nearestQuartXZ(zoomSeed, blockX, blockY, blockZ);
-        int quartX = (int) (quart >> 32);
-        int quartZ = (int) quart;
-        int quartY = nearestQuartY(zoomSeed, blockX, blockY, blockZ);
+        int corner = nearestCorner(zoomSeed, blockX, blockY, blockZ);
+        int quartX = (blockX - 2 >> 2) + ((corner & 4) == 0 ? 0 : 1);
+        int quartY = (blockY - 2 >> 2) + ((corner & 2) == 0 ? 0 : 1);
+        int quartZ = (blockZ - 2 >> 2) + ((corner & 1) == 0 ? 0 : 1);
         return source.getNoiseBiome(quartX, quartY, quartZ);
     }
 
@@ -31,12 +31,6 @@ public final class FFDVerticalBiomeZoomer {
         int quartX = (corner & 4) == 0 ? parentX : parentX + 1;
         int quartZ = (corner & 1) == 0 ? parentZ : parentZ + 1;
         return (long) quartX << 32 | quartZ & 0xFFFFFFFFL;
-    }
-
-    private static int nearestQuartY(long zoomSeed, int blockX, int blockY, int blockZ) {
-        int corner = nearestCorner(zoomSeed, blockX, blockY, blockZ);
-        int parentY = blockY - 2 >> 2;
-        return (corner & 2) == 0 ? parentY : parentY + 1;
     }
 
     private static int nearestCorner(long zoomSeed, int blockX, int blockY, int blockZ) {

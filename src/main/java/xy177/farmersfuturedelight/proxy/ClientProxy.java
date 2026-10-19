@@ -209,6 +209,7 @@ public class ClientProxy extends CommonProxy {
             registerModel(FFDItems.BLUE_ICE, "blue_ice");
         }
         if (FFDItems.isStrippedWoodEnabled()) {
+            registerModels(FFDItems.WOOD_ITEMS);
             registerModels(FFDItems.STRIPPED_LOG_ITEMS);
             registerModels(FFDItems.STRIPPED_WOOD_ITEMS);
             registerModels(FFDItems.OVERWORLD_TRAPDOOR_ITEMS);
@@ -216,6 +217,8 @@ public class ClientProxy extends CommonProxy {
             registerModels(FFDItems.OVERWORLD_PRESSURE_PLATE_ITEMS);
             registerMirroredStateMappers(FFDBlocks.OVERWORLD_TRAPDOORS_WATERLOGGED,
                     FFDBlocks.OVERWORLD_TRAPDOORS);
+            registerMirroredStateMapper(FFDBlocks.OVERWORLD_TRAPDOORS_WATERLOGGED[0],
+                    net.minecraft.init.Blocks.TRAPDOOR);
         }
         if (FFDItems.isPumpkinEnabled()) {
             registerModel(FFDItems.PUMPKIN, "pumpkin");
@@ -886,6 +889,22 @@ public class ClientProxy extends CommonProxy {
             if (entity instanceof net.minecraft.entity.player.EntityPlayer) {
                 xy177.farmersfuturedelight.common.FFDRiptide.setClientTicks(
                         (net.minecraft.entity.player.EntityPlayer) entity, ticks);
+            }
+        });
+    }
+
+    @Override
+    public void handleDrownedConverting(int dimension, int entityId, boolean converting) {
+        Minecraft.getMinecraft().addScheduledTask(() -> {
+            net.minecraft.world.World world = Minecraft.getMinecraft().world;
+            if (world == null || world.provider.getDimension() != dimension) {
+                return;
+            }
+            net.minecraft.entity.Entity entity = world.getEntityByID(entityId);
+            if (entity instanceof net.minecraft.entity.EntityLivingBase) {
+                entity.getEntityData().setBoolean(
+                        xy177.farmersfuturedelight.common.FFDGameplayEvents.DROWNED_CONVERTING_TAG,
+                        converting);
             }
         });
     }

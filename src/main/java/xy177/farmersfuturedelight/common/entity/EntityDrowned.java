@@ -3,14 +3,18 @@ package xy177.farmersfuturedelight.common.entity;
 import com.google.common.base.Predicate;
 import com.google.common.collect.Multimap;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Random;
 import javax.annotation.Nullable;
 
 import net.minecraft.block.material.Material;
 import net.minecraft.enchantment.EnchantmentHelper;
 import net.minecraft.entity.Entity;
+import net.minecraft.entity.EntityList;
 import net.minecraft.entity.EntityCreature;
 import net.minecraft.entity.EntityLivingBase;
+import net.minecraft.entity.EntityLiving;
 import net.minecraft.entity.IEntityLivingData;
 import net.minecraft.entity.IRangedAttackMob;
 import net.minecraft.entity.MoverType;
@@ -63,6 +67,7 @@ import net.minecraft.world.biome.Biome;
 import net.minecraftforge.common.BiomeDictionary;
 import xy177.farmersfuturedelight.FarmerFutureDelight;
 import xy177.farmersfuturedelight.common.FFDPowderSnowEvents;
+import xy177.farmersfuturedelight.common.registry.FFDEntities;
 import xy177.farmersfuturedelight.common.registry.FFDItems;
 import xy177.farmersfuturedelight.common.registry.FFDSounds;
 
@@ -566,6 +571,68 @@ public class EntityDrowned extends EntityZombie implements IRangedAttackMob {
                     zombie.getCachedUniqueIdString(), scoreTeam);
         }
         zombie.setDead();
+        return true;
+    }
+
+    public static boolean convertFrom(EntityLivingBase source, ResourceLocation targetId) {
+        if (source instanceof EntityZombie && FFDEntities.DROWNED_ID.equals(targetId)) {
+            return convertFrom((EntityZombie) source);
+        }
+        if (source.world.isRemote || source.isDead || targetId == null) {
+            return false;
+        }
+        ResourceLocation sourceId = EntityList.getKey(source);
+        if (targetId.equals(sourceId)) {
+            return false;
+        }
+        Entity converted = EntityList.createEntityByIDFromName(targetId, source.world);
+        if (!(converted instanceof EntityLivingBase)) {
+            return false;
+        }
+        NBTTagCompound customData = (NBTTagCompound) source.getEntityData().copy();
+        customData.removeTag(SUBMERGED_TICKS_TAG);
+        customData.removeTag(CONVERSION_TICKS_TAG);
+        NBTTagCompound entityData = source.writeToNBT(new NBTTagCompound());
+        entityData.removeTag("UUIDMost");
+        entityData.removeTag("UUIDLeast");
+        entityData.removeTag("Attributes");
+        entityData.removeTag("Passengers");
+        entityData.setTag("ForgeData", customData);
+        converted.readFromNBT(entityData);
+        ((EntityLivingBase) converted).setHealth(Math.min(source.getHealth(),
+                ((EntityLivingBase) converted).getMaxHealth()));
+        converted.copyLocationAndAnglesFrom(source);
+        converted.motionX = source.motionX;
+        converted.motionY = source.motionY;
+        converted.motionZ = source.motionZ;
+        List<Entity> passengers = new ArrayList<>(source.getPassengers());
+        Entity vehicle = source.getRidingEntity();
+        Entity leashHolder = source instanceof EntityLiving && ((EntityLiving) source).getLeashed()
+                ? ((EntityLiving) source).getLeashHolder() : null;
+        Team team = source.getTeam();
+        if (!source.world.spawnEntity(converted)) {
+            return false;
+        }
+        for (Entity passenger : passengers) {
+            passenger.dismountRidingEntity();
+            passenger.startRiding(converted, true);
+        }
+        if (vehicle != null) {
+            source.dismountRidingEntity();
+            converted.startRiding(vehicle, true);
+        }
+        if (leashHolder != null && converted instanceof EntityLiving) {
+            ((EntityLiving) source).clearLeashed(false, false);
+            ((EntityLiving) converted).setLeashHolder(leashHolder, true);
+        }
+        if (team instanceof ScorePlayerTeam) {
+            ScorePlayerTeam scoreTeam = (ScorePlayerTeam) team;
+            source.world.getScoreboard().addPlayerToTeam(
+                    converted.getCachedUniqueIdString(), scoreTeam.getName());
+            source.world.getScoreboard().removePlayerFromTeam(
+                    source.getCachedUniqueIdString(), scoreTeam);
+        }
+        source.setDead();
         return true;
     }
 

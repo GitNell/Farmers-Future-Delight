@@ -397,6 +397,11 @@ public class TileEntityBeehive extends TileEntity implements ITickable {
     }
 
     @Override
+    public NBTTagCompound getUpdateTag() {
+        return writeToNBT(new NBTTagCompound());
+    }
+
+    @Override
     public void onDataPacket(NetworkManager network, SPacketUpdateTileEntity packet) {
         readFromNBT(packet.getNbtCompound());
         if (world != null) {

@@ -13,6 +13,7 @@ import net.minecraft.util.EnumFacing;
 import net.minecraft.util.EnumHand;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.world.World;
+import xy177.farmersfuturedelight.common.registry.FFDBlocks;
 
 public class ItemNetherPlant extends ItemBlock {
     private final Block pottedBlock;
@@ -20,6 +21,12 @@ public class ItemNetherPlant extends ItemBlock {
     public ItemNetherPlant(Block block, Block pottedBlock) {
         super(block);
         this.pottedBlock = pottedBlock;
+    }
+
+    @Override
+    public int getItemBurnTime(ItemStack stack) {
+        return block == FFDBlocks.AZALEA || block == FFDBlocks.FLOWERING_AZALEA
+                ? 100 : super.getItemBurnTime(stack);
     }
 
     @Override

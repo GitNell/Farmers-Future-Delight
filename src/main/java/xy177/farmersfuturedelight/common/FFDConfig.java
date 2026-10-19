@@ -1,12 +1,23 @@
 package xy177.farmersfuturedelight.common;
 
 import java.io.File;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.Locale;
 import java.util.Map;
+
+import com.google.gson.Gson;
+import com.google.gson.JsonParseException;
 
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.EntityList;
@@ -91,8 +102,8 @@ public final class FFDConfig {
     private static final String CATEGORY_DEBUG = "debug";
     private static final String CATEGORY_INTERNAL = "internal";
     private static final String CATEGORY_COMPATIBILITY = "compatibility";
-    private static final int CURRENT_CONFIG_VERSION = 17;
-    private static final String AUTO_COMPATIBILITY_COMMENT = "逐个控制 AUTO 自动避让的外部模组。仅当对应内容开关为 AUTO 时生效。每行格式为 内容注册名@外部模组ID=true或false：true 表示该模组提供对应内容时让位给它，false 表示忽略该模组并继续使用未世之乐内容。默认名单包含所有已支持的内容与模组组合，即使对应模组未安装也会保留；未列出的组合继续使用 AUTO 的正常判定。修改后需重启游戏。";
+    private static final int CURRENT_CONFIG_VERSION = 18;
+    private static final String AUTO_COMPATIBILITY_COMMENT = "逐个控制 AUTO 自动避让的外部模组。仅当对应内容开关为 AUTO 时生效。每行格式为 内容注册名@外部模组ID=true或false：true 表示该模组提供对应内容时让位给它，false 表示忽略该模组并继续使用未世之乐内容。默认全部为 true，名单包含所有已支持的内容与模组组合，即使对应模组未安装也会保留；未列出的组合继续使用 AUTO 的正常判定。使用 /ffd_compat preset 可用内置的约定预设覆盖此名单。修改后需重启游戏或服务端。";
 
     public static FeatureMode sweetBerryMode;
     public static FeatureMode honeyMode;
@@ -213,12 +224,16 @@ public final class FFDConfig {
     public static String[] powderSnowMobImmunities;
     public static String[] powderSnowAdditionalDamage;
     public static String[] powderSnowWalkableBoots;
+    public static String[] powderSnowWalkableMobs;
     public static String[] powderSnowFreezingArmor;
     public static String[] turtleEggDestroyingMobs;
     public static String[] turtleBabyPredatorMobs;
     public static String[] waterSinkingMobs;
     public static String[] waterDrowningImmuneMobs;
     public static String[] drownedTransformationMobs;
+    public static String[] impalingDamageMobs;
+    private static volatile Map<ResourceLocation, ResourceLocation> drownedTransformationTargets =
+            Collections.emptyMap();
     public static float goatScreamingChance;
     public static float goatSingleHornChance;
     public static int goatLongJumpCooldownMinTicks;
@@ -254,6 +269,8 @@ public final class FFDConfig {
     public static int amethystGeodeRarity;
     public static int amethystGeodeMinY;
     public static int amethystGeodeMaxY;
+    public static int amethystGeodeLegacyMinY;
+    public static int amethystGeodeLegacyMaxY;
     public static int amethystGeodeOuterWallMin;
     public static int amethystGeodeOuterWallMax;
     public static int amethystGeodeDistributionMin;
@@ -479,7 +496,7 @@ public final class FFDConfig {
         seaPickleMode = readMode(config, "seaPickleMode", "海泡菜内容开关");
         coralMode = readMode(config, "coralMode", "珊瑚、珊瑚块与珊瑚扇内容开关");
         blueIceMode = readMode(config, "blueIceMode", "蓝冰内容开关");
-        strippedWoodMode = readMode(config, "strippedWoodMode", "原版去皮原木、去皮木及主世界木材装饰内容开关");
+        strippedWoodMode = readMode(config, "strippedWoodMode", "原版六面树皮木、去皮原木、去皮木及主世界木材装饰内容开关");
         pumpkinMode = readMode(config, "pumpkinMode", "无脸南瓜内容开关");
         prismarineDecorMode = readMode(config, "prismarineDecorMode", "海晶石楼梯与台阶内容开关");
         conduitMode = readMode(config, "conduitMode", "潮涌核心、鹦鹉螺壳与海洋之心内容开关");
@@ -564,7 +581,7 @@ public final class FFDConfig {
                 new String[]{"minecraft:prismarine", "minecraft:sea_lantern"},
                 "潮涌核心框架方块列表。格式为 namespace:block 或 namespace:block:metadata；不填写 metadata 时接受该方块的全部变体。默认包括海晶石全部变体和海晶灯，修改后需重启游戏。");
         commandCompletionMode = readMode(config, "commandCompletionMode",
-                "高版本风格指令补全开关。AUTO 在检测到 Cleanroom Loader 时让位给它");
+                "高版本风格指令补全开关。ENABLED 使用本模组的补全界面；DISABLED 关闭；AUTO 在检测到 Cleanroom Loader 时让位给它。安装 Salutation 时，ENABLED 和 AUTO 均让位给 Salutation，避免聊天界面冲突");
 
         String[] defaultAutoCompatibilityToggles = FFDCompat.defaultAutoCompatibilityToggles();
         String[] configuredAutoCompatibilityToggles = config.getStringList(
@@ -608,7 +625,7 @@ public final class FFDConfig {
                 new String[]{"MODERN", "LEGACY"}));
         modernWorldLoadingScreen = config.getBoolean("modernWorldLoadingScreen",
                 CATEGORY_GAMEPLAY, false,
-                "是否在创建或进入世界时使用高版本风格的加载画面。关闭时所有世界类型均使用原版 1.12.2 加载画面。仅影响客户端显示。");
+                "是否在创建或进入世界时使用高版本风格的加载画面。");
         cavesAndCliffsBackgroundMusic = config.getBoolean("cavesAndCliffsBackgroundMusic",
                 CATEGORY_GAMEPLAY, true,
                 "是否将 1.18 的八首背景音乐加入所有世界类型的生存模式与主菜单音乐池。");
@@ -752,6 +769,10 @@ public final class FFDConfig {
         powderSnowWalkableBoots = config.getStringList(
                 "powderSnowWalkableBoots", CATEGORY_GAMEPLAY, new String[0],
                 "穿戴后可在细雪表面行走而不陷入的靴子物品注册名列表，例如 twilightforest:yeti_boots。皮革靴仍始终有效。");
+        powderSnowWalkableMobs = config.getStringList(
+                "powderSnowWalkableMobs", CATEGORY_GAMEPLAY,
+                new String[]{"minecraft:rabbit", "minecraft:endermite", "minecraft:silverfish"},
+                "可在细雪表面行走而不陷入的生物注册名列表。默认包含兔子、末影螨和蠹虫；穿靴行走与冻结免疫规则独立生效。");
         powderSnowFreezingArmor = config.getStringList(
                 "powderSnowFreezingArmor", CATEGORY_GAMEPLAY, new String[0],
                 "穿戴后可免疫细雪冻结的盔甲物品注册名列表。任意装备栏中有一件匹配装备即可生效；原版皮革盔甲仍始终有效，例如 twilightforest:yeti_chestplate。");
@@ -778,8 +799,25 @@ public final class FFDConfig {
                 "不会溺水的生物注册名列表");
         drownedTransformationMobs = config.getStringList(
                 "drownedTransformationMobs", CATEGORY_GAMEPLAY,
-                new String[]{"minecraft:zombie"},
-                "连续浸水后转化为溺尸的僵尸类生物注册名列表。每项必须是 EntityZombie 或其子类的注册名；默认仅包含僵尸。");
+                new String[]{"minecraft:zombie;farmers_future_delight:drowned"},
+                "连续浸水后的生物转换规则。每行填写 来源生物注册名;目标生物注册名，默认包含 minecraft:zombie;farmers_future_delight:drowned。旧版仅填写来源的条目会自动补上溺尸目标。链式转换的每一步都需要重新浸水计时，循环规则会被忽略。");
+        drownedTransformationMobs = normalizeDrownedTransformationEntries(config,
+                drownedTransformationMobs);
+        reloadDrownedTransformationRules();
+        impalingDamageMobs = config.getStringList(
+                "impalingDamageMobs", CATEGORY_GAMEPLAY,
+                new String[]{"minecraft:guardian", "minecraft:elder_guardian", "minecraft:squid",
+                        "minecraft:glow_squid", "minecraft:cod", "minecraft:salmon",
+                        "minecraft:pufferfish", "minecraft:puffer_fish", "minecraft:tropical_fish",
+                        "minecraft:dolphin", "minecraft:turtle", "minecraft:axolotl",
+                        "farmers_future_delight:glow_squid", "farmers_future_delight:cod",
+                        "farmers_future_delight:salmon", "farmers_future_delight:pufferfish",
+                        "farmers_future_delight:tropical_fish", "farmers_future_delight:dolphin",
+                        "farmers_future_delight:turtle", "farmers_future_delight:axolotl",
+                        "futuremc:cod", "futuremc:salmon", "futuremc:pufferfish",
+                        "futuremc:tropical_fish", "oe:cod", "oe:salmon", "oe:pufferfish",
+                        "oe:tropical_fish", "oe:dolphin", "oe:turtle", "oe:glow_squid"},
+                "可受到穿刺附魔额外伤害的生物注册名列表。穿刺每级默认额外造成 2.5 点伤害。修改名单不会改变三叉戟激流的使用条件。");
         logAutoCompatibilityDecisions = config.getBoolean("logAutoCompatibilityDecisions", CATEGORY_DEBUG,
                 false, "是否在日志中逐项显示 AUTO 自动避让的内容与世界生成判定。默认关闭；仅建议排查兼容问题时开启。");
 
@@ -864,6 +902,11 @@ public final class FFDConfig {
         amethystGeodeMaxY = config.getInt("amethystGeodeMaxY", CATEGORY_WORLDGEN,
                 30, -64, 319, "紫水晶晶洞中心的最高生成高度，26.3 默认值为 30。");
         amethystGeodeMaxY = Math.max(amethystGeodeMinY, amethystGeodeMaxY);
+        amethystGeodeLegacyMinY = config.getInt("amethystGeodeLegacyMinY", CATEGORY_WORLDGEN,
+                16, 16, 240, "普通世界紫水晶晶洞中心的最低生成高度，不适用于洞穴与山崖世界。");
+        amethystGeodeLegacyMaxY = config.getInt("amethystGeodeLegacyMaxY", CATEGORY_WORLDGEN,
+                30, 16, 240, "普通世界紫水晶晶洞中心的最高生成高度，不适用于洞穴与山崖世界。");
+        amethystGeodeLegacyMaxY = Math.max(amethystGeodeLegacyMinY, amethystGeodeLegacyMaxY);
         amethystGeodeOuterWallMin = config.getInt("amethystGeodeOuterWallMin", CATEGORY_WORLDGEN,
                 4, 1, 20, "晶洞分布点到中心的最小外墙距离，26.3 默认值为 4。");
         amethystGeodeOuterWallMax = config.getInt("amethystGeodeOuterWallMax", CATEGORY_WORLDGEN,
@@ -1276,6 +1319,93 @@ public final class FFDConfig {
         }
     }
 
+    private static String[] normalizeDrownedTransformationEntries(Configuration config,
+                                                                   String[] entries) {
+        if (entries == null) {
+            return new String[0];
+        }
+        String[] normalized = entries.clone();
+        boolean changed = false;
+        for (int index = 0; index < normalized.length; index++) {
+            String entry = normalized[index];
+            if (entry == null) {
+                continue;
+            }
+            String[] parts = entry.split(";", -1);
+            if (parts.length == 1 && parseEntityId(parts[0]) != null) {
+                normalized[index] = parts[0].trim() + ";farmers_future_delight:drowned";
+                changed = true;
+            }
+        }
+        if (changed) {
+            config.getCategory(CATEGORY_GAMEPLAY).get("drownedTransformationMobs").set(normalized);
+        }
+        return normalized;
+    }
+
+    private static Map<ResourceLocation, ResourceLocation> parseDrownedTransformationTargets(
+            String[] entries) {
+        Map<ResourceLocation, ResourceLocation> targets = new HashMap<>();
+        if (entries == null) {
+            return targets;
+        }
+        for (String entry : entries) {
+            if (entry == null) {
+                continue;
+            }
+            String[] parts = entry.split(";", -1);
+            if (parts.length != 2) {
+                continue;
+            }
+            ResourceLocation source = parseEntityId(parts[0]);
+            ResourceLocation target = parseEntityId(parts[1]);
+            if (source != null && target != null && !source.equals(target)) {
+                targets.put(source, target);
+            }
+        }
+        for (ResourceLocation start : new ArrayList<>(targets.keySet())) {
+            Map<ResourceLocation, Integer> visited = new HashMap<>();
+            ResourceLocation current = start;
+            int order = 0;
+            while (current != null && targets.containsKey(current)) {
+                Integer previous = visited.put(current, order++);
+                if (previous != null) {
+                    for (Map.Entry<ResourceLocation, Integer> entry : visited.entrySet()) {
+                        if (entry.getValue() >= previous) {
+                            targets.remove(entry.getKey());
+                        }
+                    }
+                    break;
+                }
+                current = targets.get(current);
+            }
+        }
+        return targets;
+    }
+
+    public static void reloadDrownedTransformationRules() {
+        drownedTransformationTargets = Collections.unmodifiableMap(
+                parseDrownedTransformationTargets(drownedTransformationMobs));
+    }
+
+    private static ResourceLocation parseEntityId(String value) {
+        if (value == null) {
+            return null;
+        }
+        String id = value.trim().toLowerCase(Locale.ROOT);
+        if (id.isEmpty()) {
+            return null;
+        }
+        if (id.indexOf(':') < 0) {
+            id = "minecraft:" + id;
+        }
+        try {
+            return new ResourceLocation(id);
+        } catch (IllegalArgumentException ignored) {
+            return null;
+        }
+    }
+
     private static boolean applyBilingualComments(Configuration config) {
         boolean changed = false;
         for (String categoryName : config.getCategoryNames()) {
@@ -1343,7 +1473,7 @@ public final class FFDConfig {
 
     private static String englishDescription(String category, String key) {
         if ("autoCompatibilityToggles".equals(key)) {
-            return "Per-content AUTO compatibility overrides in content_path@mod_id=true or content_path@mod_id=false form. true yields to that mod when it provides the matching content; false ignores that mod for this content. The default list includes every supported content and mod combination, including mods that are not installed. Missing combinations use the normal AUTO decision. Restart required.";
+            return "Per-content AUTO compatibility overrides in content_path@mod_id=true or content_path@mod_id=false form. true yields to that mod when it provides the matching content; false ignores that mod for this content. All entries default to true. The list includes every supported content and mod combination, including mods that are not installed. Missing combinations use the normal AUTO decision. Use /ffd_compat preset to replace this list with the built-in agreed preset. Restart the game or server after changes.";
         }
         if ("signTextMode".equals(key)) {
             return "Enables or disables sign text dyeing and glowing. This behavior has no AUTO compatibility target; legacy AUTO values are treated as ENABLED. Restart required.";
@@ -1379,10 +1509,13 @@ public final class FFDConfig {
             return "Conduit frame block list. Use namespace:block or namespace:block:metadata; omitting metadata accepts every variant of that block. The default list includes all prismarine variants and sea lanterns. Restart required.";
         }
         if ("commandCompletionMode".equals(key)) {
-            return "Feature mode for the high-version-style command completion screen. ENABLED uses this mod's screen; DISABLED turns it off; AUTO yields to Cleanroom Loader when it is detected. Restart required.";
+            return "Feature mode for the high-version-style command completion screen. ENABLED uses this mod's screen; DISABLED turns it off; AUTO yields to Cleanroom Loader when it is detected. When Salutation is installed, both ENABLED and AUTO yield to it to prevent chat-screen conflicts. Restart required.";
         }
         if (CATEGORY_FEATURES.equals(category)) {
-            return "Feature mode for " + humanizeKey(key.replace("Mode", ""))
+            String featureName = "strippedWoodMode".equals(key)
+                    ? "vanilla bark wood, stripped logs, stripped wood and overworld wood decorations"
+                    : humanizeKey(key.replace("Mode", ""));
+            return "Feature mode for " + featureName
                     + ". Defaults to " + defaultFeatureMode(key).name()
                     + ". ENABLED uses this mod's implementation; DISABLED turns it off; AUTO resolves each compatible content unit independently and fills only missing units locally.";
         }
@@ -1420,7 +1553,7 @@ public final class FFDConfig {
             return "Water visual mode. MODERN uses 1.13-style grayscale water textures, biome tinting, underwater fog colors, and gradually improving underwater visibility; LEGACY preserves the 1.12.2 water visuals. Client-side only. Restart required.";
         }
         if ("modernWorldLoadingScreen".equals(key)) {
-            return "Use the modern-style loading screen while creating or entering a world. Disabled by default; when disabled, every world type uses the original 1.12.2 loading screen. Client-side display only.";
+            return "Use the modern-style loading screen while creating or entering a world.";
         }
         if ("cavesAndCliffsBackgroundMusic".equals(key)) {
             return "Add the eight Minecraft 1.18 background tracks to the survival and main-menu music pools in every world type.";
@@ -1587,6 +1720,9 @@ public final class FFDConfig {
         if ("powderSnowWalkableBoots".equals(key)) {
             return "Item registry names for boots that let their wearer walk on powder snow without sinking. Leather boots always work.";
         }
+        if ("powderSnowWalkableMobs".equals(key)) {
+            return "Entity registry names that can walk on powder snow without sinking. Defaults to rabbits, endermites, and silverfish; boot-based walking and freezing immunity remain independent.";
+        }
         if ("powderSnowFreezingArmor".equals(key)) {
             return "Item registry names for armor that prevents powder-snow freezing. One matching item in any armor slot is enough; vanilla leather armor always works. For example twilightforest:yeti_chestplate.";
         }
@@ -1603,7 +1739,10 @@ public final class FFDConfig {
             return "Entity registry names that do not lose air or drown in water, independently of the sinking list. Defaults to 26.3 undead types present in 1.12.2; innate underwater breathing, lava damage, and in-wall suffocation are unchanged.";
         }
         if ("drownedTransformationMobs".equals(key)) {
-            return "Entity registry names for zombie-derived mobs that transform into drowned after remaining submerged. Entries must be EntityZombie subclasses; only minecraft:zombie is enabled by default.";
+            return "Submerged entity transformation rules, one source entity registry name;target entity registry name per line. Defaults to minecraft:zombie;farmers_future_delight:drowned. Legacy source-only entries receive the drowned target automatically. Each step in a chain requires a new submersion countdown; cyclic rules are ignored.";
+        }
+        if ("impalingDamageMobs".equals(key)) {
+            return "Entity registry names that receive extra Impaling damage. Each enchantment level adds 2.5 damage by default. Changing this list does not change when Riptide can be used.";
         }
         if ("goatScreamingChance".equals(key)) {
             return "Base chance for a spawned or bred goat to be a screaming goat. The 26.3 default is 0.02.";
@@ -1802,7 +1941,9 @@ public final class FFDConfig {
         FeatureMode defaultMode = defaultFeatureMode(key);
         String value = config.getString(key, CATEGORY_FEATURES, defaultMode.name(),
                 comment + "。默认值为 " + defaultMode.name()
-                        + "。可选值：ENABLED、DISABLED、AUTO。ENABLED 关闭自动避让并使用本模组实现；AUTO 会逐个识别外部内容单元，并仅由本模组补齐缺失内容。",
+                        + "。可选值：ENABLED、DISABLED、AUTO。"
+                        + ("commandCompletionMode".equals(key) ? ""
+                                : "ENABLED 关闭自动避让并使用本模组实现；AUTO 会逐个识别外部内容单元，并仅由本模组补齐缺失内容。"),
                 new String[]{"ENABLED", "DISABLED", "AUTO"});
         return FeatureMode.parse(value, defaultMode);
     }
@@ -1909,6 +2050,17 @@ public final class FFDConfig {
             }
         }
         return false;
+    }
+
+    public static ResourceLocation getDrownedTransformationTarget(Entity entity) {
+        if (entity == null) {
+            return null;
+        }
+        ResourceLocation source = EntityList.getKey(entity);
+        ResourceLocation target = source == null ? null : drownedTransformationTargets.get(source);
+        Class<? extends Entity> targetClass = target == null ? null : EntityList.getClass(target);
+        return targetClass != null && net.minecraft.entity.EntityLivingBase.class.isAssignableFrom(targetClass)
+                ? target : null;
     }
 
     public static boolean isTurtleEntity(Entity entity) {
@@ -2096,8 +2248,59 @@ public final class FFDConfig {
         }
     }
 
+    public static synchronized int applyAgreedAutoCompatibilityPreset() throws IOException {
+        if (configurationFile == null) {
+            throw new IOException("Configuration path is unavailable");
+        }
+        String[] preset;
+        try (InputStream stream = FFDConfig.class.getResourceAsStream(
+                "/assets/farmers_future_delight/compatibility/agreed_auto_compatibility.json")) {
+            if (stream == null) {
+                throw new IOException("Compatibility preset is unavailable");
+            }
+            preset = new Gson().fromJson(new InputStreamReader(stream, StandardCharsets.UTF_8),
+                    String[].class);
+        } catch (JsonParseException invalid) {
+            throw new IOException("Invalid compatibility preset", invalid);
+        }
+        if (preset == null || preset.length == 0) {
+            throw new IOException("Compatibility preset is empty");
+        }
+        for (String entry : preset) {
+            if (autoCompatibilityKey(entry) == null) {
+                throw new IOException("Invalid compatibility preset entry: " + entry);
+            }
+        }
+        Path target = configurationFile.toPath().toAbsolutePath();
+        Path staged = Files.createTempFile(target.getParent(), "ffd-compat-", ".cfg");
+        try {
+            if (Files.exists(target)) {
+                Files.copy(target, staged, StandardCopyOption.REPLACE_EXISTING);
+            }
+            Configuration config = new Configuration(staged.toFile());
+            config.get(CATEGORY_FEATURES, "autoCompatibilityToggles", preset,
+                    bilingualPropertyComment(AUTO_COMPATIBILITY_COMMENT,
+                            CATEGORY_FEATURES, "autoCompatibilityToggles")).set(preset);
+            config.save();
+            Configuration verify = new Configuration(staged.toFile());
+            if (!Arrays.equals(preset, verify.get(CATEGORY_FEATURES,
+                    "autoCompatibilityToggles", new String[0]).getStringList())) {
+                throw new IOException("Could not persist compatibility preset");
+            }
+            try {
+                Files.move(staged, target, StandardCopyOption.ATOMIC_MOVE,
+                        StandardCopyOption.REPLACE_EXISTING);
+            } catch (java.nio.file.AtomicMoveNotSupportedException unsupported) {
+                Files.move(staged, target, StandardCopyOption.REPLACE_EXISTING);
+            }
+        } finally {
+            Files.deleteIfExists(staged);
+        }
+        return preset.length;
+    }
+
     public static boolean isCommandCompletionEnabled() {
-        if (commandCompletionMode == FeatureMode.DISABLED) {
+        if (commandCompletionMode == FeatureMode.DISABLED || Loader.isModLoaded("salutation")) {
             return false;
         }
         if (commandCompletionMode == FeatureMode.AUTO) {

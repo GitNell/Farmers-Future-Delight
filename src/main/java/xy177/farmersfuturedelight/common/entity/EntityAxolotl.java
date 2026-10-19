@@ -32,6 +32,7 @@ import net.minecraft.init.Blocks;
 import net.minecraft.init.Items;
 import net.minecraft.init.MobEffects;
 import net.minecraft.item.ItemStack;
+import net.minecraft.item.ItemMonsterPlacer;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.network.datasync.DataParameter;
 import net.minecraft.network.datasync.DataSerializers;
@@ -497,6 +498,10 @@ public class EntityAxolotl extends EntityAnimal {
         ItemStack effective = FFDItems.effectiveStack(FFDItems.TROPICAL_FISH_BUCKET);
         if (!effective.isEmpty() && stack.getItem() == effective.getItem()
                 && stack.getMetadata() == effective.getMetadata()) {
+            if (effective.getItem() instanceof ItemMonsterPlacer) {
+                ResourceLocation entityId = ItemMonsterPlacer.getNamedIdFrom(effective);
+                return entityId != null && entityId.equals(ItemMonsterPlacer.getNamedIdFrom(stack));
+            }
             return true;
         }
         String path = stack.getItem().getRegistryName().getResourcePath();

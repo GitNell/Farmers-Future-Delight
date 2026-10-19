@@ -8,10 +8,19 @@ import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
+import net.minecraft.init.Blocks;
 import net.minecraft.init.Biomes;
 import net.minecraft.util.ResourceLocation;
 import net.minecraft.world.biome.Biome;
+import net.minecraft.world.biome.BiomeDesert;
+import net.minecraft.world.biome.BiomeHills;
+import net.minecraft.world.biome.BiomeJungle;
+import net.minecraft.world.biome.BiomeMesa;
+import net.minecraft.world.biome.BiomeSavanna;
+import net.minecraft.world.biome.BiomeSnow;
+import net.minecraft.world.biome.BiomeTaiga;
 import net.minecraftforge.common.BiomeDictionary;
 import net.minecraftforge.common.BiomeManager;
 import net.minecraftforge.fml.common.Loader;
@@ -47,6 +56,7 @@ final class FFDBiomeCandidateSelector {
     private static final int VANILLA_VARIANT_REGION_SIZE = 128;
     private static final long VANILLA_VARIANT_SALT = 0xA4093822299F31D0L;
     private static final long VANILLA_MUTATION_SALT = 0x082EFA98EC4E6C89L;
+    private static final Map<Biome, Family> BIOME_FAMILIES = new ConcurrentHashMap<>();
 
     private static final double[] TEMPERATURE_MIN = {
             -1.0D, -0.45D, -0.15D, 0.2D, 0.55D
@@ -136,7 +146,7 @@ final class FFDBiomeCandidateSelector {
         Biome selected;
         if (!biomesOPlentyLoaded) {
             selected = selectLegacy(sample, blockX, blockZ, fallback, targetFamily);
-            return applyVanillaSubBiomeVariant(selected, blockX, blockZ);
+            return applyVanillaSubBiomeVariant(sample, selected, blockX, blockZ);
         }
         CandidateScratch scratch = candidateScratch.get();
         Entry[] candidates = scratch.entries;
@@ -166,7 +176,7 @@ final class FFDBiomeCandidateSelector {
             }
         }
         if (candidateCount == 0) {
-            return applyVanillaSubBiomeVariant(fallback, blockX, blockZ);
+            return applyVanillaSubBiomeVariant(sample, fallback, blockX, blockZ);
         }
 
         long region = regionSeed(blockX, blockZ, targetFamily,
@@ -181,11 +191,11 @@ final class FFDBiomeCandidateSelector {
             selectedWeight -= selectionWeight(candidates[i], scores[i], scores[0]);
             if (selectedWeight <= 0.0D) {
                 selected = candidates[i].biome;
-                return applyVanillaSubBiomeVariant(selected, blockX, blockZ);
+                return applyVanillaSubBiomeVariant(sample, selected, blockX, blockZ);
             }
         }
         selected = candidates[candidateCount - 1].biome;
-        return applyVanillaSubBiomeVariant(selected, blockX, blockZ);
+        return applyVanillaSubBiomeVariant(sample, selected, blockX, blockZ);
     }
 
     private Biome selectLegacy(Sample sample, int blockX, int blockZ,
@@ -355,20 +365,21 @@ final class FFDBiomeCandidateSelector {
         }
     }
 
-    private Biome applyVanillaSubBiomeVariant(Biome selected, int blockX, int blockZ) {
+    private Biome applyVanillaSubBiomeVariant(Sample sample, Biome selected,
+                                             int blockX, int blockZ) {
         if (selected == null || isVanillaSubBiome(selected)) {
             return selected;
         }
         long variantSeed = regionSeed(blockX, blockZ, VANILLA_VARIANT_REGION_SIZE,
                 VANILLA_VARIANT_SALT, VANILLA_VARIANT_SALT);
         Biome mutation = Biome.getMutationForBiome(selected);
-        if (mutation != null
+        if (mutation != null && FFDModernBiomeResolver.isCompatible(sample, mutation)
                 && unit01(mix(variantSeed ^ VANILLA_MUTATION_SALT, 0, 0))
                 < VANILLA_MUTATION_CHANCE) {
             return mutation;
         }
         Biome hills = vanillaHillsBiome(selected);
-        if (hills != null) {
+        if (hills != null && FFDModernBiomeResolver.isCompatible(sample, hills)) {
             double chance = selected == Biomes.PLAINS
                     ? VANILLA_HILLS_CHANCE / 3.0D : VANILLA_HILLS_CHANCE;
             if (unit01(variantSeed) < chance) {
@@ -684,6 +695,35 @@ final class FFDBiomeCandidateSelector {
     }
 
     private static Family familyOf(Biome biome) {
+        return BIOME_FAMILIES.computeIfAbsent(biome, FFDBiomeCandidateSelector::classifyFamily);
+    }
+
+    static boolean hasCompatibleFamily(Sample sample, Biome candidate) {
+        Family target = familyOf(sample.biome);
+        Family actual = familyOf(candidate);
+        if (target != actual && !(target.isRelief() && actual.isRelief())) {
+            return false;
+        }
+        if (target == Family.COAST) {
+            boolean stone = candidate.topBlock.getBlock() == Blocks.STONE
+                    || candidate.topBlock.getBlock() == Blocks.GRAVEL;
+            if (stone != (sample.biome == ModernBiome.STONY_SHORE)) {
+                return false;
+            }
+        }
+        if (sample.role == TerrainRole.LAND || sample.role == TerrainRole.COAST
+                || sample.role == TerrainRole.RIVER) {
+            Biome fallback = sample.fallbackBiome();
+            boolean snowy = candidate.isSnowyBiome()
+                    || BiomeDictionary.hasType(candidate, BiomeDictionary.Type.SNOWY);
+            boolean targetSnowy = fallback.isSnowyBiome()
+                    || BiomeDictionary.hasType(fallback, BiomeDictionary.Type.SNOWY);
+            return snowy == targetSnowy;
+        }
+        return true;
+    }
+
+    private static Family classifyFamily(Biome biome) {
         TerrainRole role = FFDModernBiomeResolver.roleOf(biome);
         if (role == TerrainRole.MUSHROOM) {
             return Family.MUSHROOM;
@@ -700,8 +740,36 @@ final class FFDBiomeCandidateSelector {
         if (role == TerrainRole.SWAMP) {
             return Family.SWAMP;
         }
-        if (BiomeDictionary.hasType(biome, BiomeDictionary.Type.MESA)) {
+        if (biome instanceof BiomeMesa
+                || BiomeDictionary.hasType(biome, BiomeDictionary.Type.MESA)) {
             return Family.BADLANDS;
+        }
+        if (biome instanceof BiomeHills && biome.getRegistryName() != null
+                && "minecraft".equals(biome.getRegistryName().getResourceDomain())) {
+            return Family.HILLS;
+        }
+        if (biome instanceof BiomeJungle
+                || BiomeDictionary.hasType(biome, BiomeDictionary.Type.JUNGLE)) {
+            return Family.JUNGLE;
+        }
+        if (biome instanceof BiomeSavanna
+                || BiomeDictionary.hasType(biome, BiomeDictionary.Type.SAVANNA)) {
+            return Family.SAVANNA;
+        }
+        if (biome instanceof BiomeTaiga
+                || BiomeDictionary.hasType(biome, BiomeDictionary.Type.CONIFEROUS)) {
+            return Family.TAIGA;
+        }
+        if (BiomeDictionary.hasType(biome, BiomeDictionary.Type.FOREST)) {
+            return Family.FOREST;
+        }
+        if (biome instanceof BiomeDesert
+                || BiomeDictionary.hasType(biome, BiomeDictionary.Type.SANDY)) {
+            return Family.DESERT;
+        }
+        if (biome instanceof BiomeSnow
+                || BiomeDictionary.hasType(biome, BiomeDictionary.Type.PLAINS)) {
+            return Family.PLAINS;
         }
         if (BiomeDictionary.hasType(biome, BiomeDictionary.Type.MOUNTAIN)) {
             return Family.MOUNTAIN;
@@ -709,22 +777,8 @@ final class FFDBiomeCandidateSelector {
         if (BiomeDictionary.hasType(biome, BiomeDictionary.Type.HILLS)) {
             return Family.HILLS;
         }
-        if (BiomeDictionary.hasType(biome, BiomeDictionary.Type.JUNGLE)) {
-            return Family.JUNGLE;
-        }
-        if (BiomeDictionary.hasType(biome, BiomeDictionary.Type.SAVANNA)) {
-            return Family.SAVANNA;
-        }
-        if (BiomeDictionary.hasType(biome, BiomeDictionary.Type.CONIFEROUS)) {
-            return Family.TAIGA;
-        }
-        if (BiomeDictionary.hasType(biome, BiomeDictionary.Type.FOREST)) {
-            return Family.FOREST;
-        }
-        if (BiomeDictionary.hasType(biome, BiomeDictionary.Type.SANDY)) {
-            return Family.DESERT;
-        }
-        if (BiomeDictionary.hasType(biome, BiomeDictionary.Type.PLAINS)) {
+        if (biome.topBlock.getBlock() == Blocks.GRASS
+                || biome.topBlock.getBlock() == Blocks.DIRT) {
             return Family.PLAINS;
         }
         return Family.GENERIC;
@@ -882,7 +936,11 @@ final class FFDBiomeCandidateSelector {
             humidityMin = HUMIDITY_MIN[humidity];
             humidityMax = HUMIDITY_MAX[humidity];
 
-            switch (family) {
+            Family relief = BiomeDictionary.hasType(biome, BiomeDictionary.Type.MOUNTAIN)
+                    ? Family.MOUNTAIN
+                    : BiomeDictionary.hasType(biome, BiomeDictionary.Type.HILLS)
+                    ? Family.HILLS : family;
+            switch (relief) {
                 case MOUNTAIN:
                     erosionMin = -1.0D;
                     erosionMax = -0.2225D;

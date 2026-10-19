@@ -174,6 +174,10 @@ public final class FFDRegistryEvents {
         }
         if (FFDItems.isStrippedWoodEnabled()) {
             FFDCustomStrippedWoods.prepare(event.getRegistry());
+            FFDBlocks.OVERWORLD_TRAPDOORS[0].setCreativeTab(null);
+            FFDBlocks.OVERWORLD_BUTTONS[0].setCreativeTab(null);
+            FFDBlocks.OVERWORLD_PRESSURE_PLATES[0].setCreativeTab(null);
+            Collections.addAll(blocks, FFDBlocks.WOODS);
             Collections.addAll(blocks, FFDBlocks.STRIPPED_LOGS);
             Collections.addAll(blocks, FFDBlocks.STRIPPED_WOODS);
             Collections.addAll(blocks, FFDBlocks.OVERWORLD_TRAPDOORS);
@@ -307,6 +311,11 @@ public final class FFDRegistryEvents {
     public static void remapRawOreItems(
             RegistryEvent.MissingMappings<net.minecraft.item.Item> event) {
         for (RegistryEvent.MissingMappings.Mapping<net.minecraft.item.Item> mapping : event.getAllMappings()) {
+            net.minecraft.block.Block legacyOak = legacyOakBlock(mapping.key);
+            if (legacyOak != null) {
+                mapping.remap(net.minecraft.item.Item.getItemFromBlock(legacyOak));
+                continue;
+            }
             if (isLegacyNetherWartBlock(mapping.key)) {
                 mapping.remap(net.minecraft.item.Item.getItemFromBlock(
                         net.minecraft.init.Blocks.NETHER_WART_BLOCK));
@@ -332,6 +341,18 @@ public final class FFDRegistryEvents {
                     && FFDItems.isItemRegistered(FFDItems.RAW_ORE_BLOCK_ITEMS[blockIndex])) {
                 mapping.remap(FFDItems.RAW_ORE_BLOCK_ITEMS[blockIndex]);
             }
+        }
+    }
+
+    private static net.minecraft.block.Block legacyOakBlock(ResourceLocation key) {
+        if (!FarmerFutureDelight.MODID.equals(key.getResourceDomain())) {
+            return null;
+        }
+        switch (key.getResourcePath()) {
+            case "oak_button": return net.minecraft.init.Blocks.WOODEN_BUTTON;
+            case "oak_pressure_plate": return net.minecraft.init.Blocks.WOODEN_PRESSURE_PLATE;
+            case "oak_trapdoor": return net.minecraft.init.Blocks.TRAPDOOR;
+            default: return null;
         }
     }
 
@@ -534,6 +555,9 @@ public final class FFDRegistryEvents {
         setFireInfoIfRegistered(FFDBlocks.SPORE_BLOSSOM, 60, 100);
         setFireInfoIfRegistered(FFDBlocks.BEE_NEST, 30, 20);
         setFireInfoIfRegistered(FFDBlocks.BEEHIVE, 5, 20);
+        for (net.minecraft.block.Block block : FFDBlocks.WOODS) {
+            setFireInfoIfRegistered(block, 5, 5);
+        }
         for (net.minecraft.block.Block block : FFDBlocks.STRIPPED_LOGS) {
             setFireInfoIfRegistered(block, 5, 5);
         }
@@ -667,11 +691,15 @@ public final class FFDRegistryEvents {
             items.add(FFDItems.BLUE_ICE);
         }
         if (FFDItems.isStrippedWoodEnabled()) {
+            Collections.addAll(items, FFDItems.WOOD_ITEMS);
             Collections.addAll(items, FFDItems.STRIPPED_LOG_ITEMS);
             Collections.addAll(items, FFDItems.STRIPPED_WOOD_ITEMS);
-            Collections.addAll(items, FFDItems.OVERWORLD_TRAPDOOR_ITEMS);
-            Collections.addAll(items, FFDItems.OVERWORLD_BUTTON_ITEMS);
-            Collections.addAll(items, FFDItems.OVERWORLD_PRESSURE_PLATE_ITEMS);
+            items.addAll(java.util.Arrays.asList(FFDItems.OVERWORLD_TRAPDOOR_ITEMS).subList(1,
+                    FFDItems.OVERWORLD_TRAPDOOR_ITEMS.length));
+            items.addAll(java.util.Arrays.asList(FFDItems.OVERWORLD_BUTTON_ITEMS).subList(1,
+                    FFDItems.OVERWORLD_BUTTON_ITEMS.length));
+            items.addAll(java.util.Arrays.asList(FFDItems.OVERWORLD_PRESSURE_PLATE_ITEMS).subList(1,
+                    FFDItems.OVERWORLD_PRESSURE_PLATE_ITEMS.length));
             for (FFDCustomStrippedWoods.Entry entry : FFDCustomStrippedWoods.entries()) {
                 if (entry.isEnabled()) {
                     if (entry.logItem() != null) {
@@ -872,6 +900,9 @@ public final class FFDRegistryEvents {
             registerOre("blockBlueIce", FFDItems.BLUE_ICE);
         }
         if (FFDItems.isStrippedWoodEnabled()) {
+            for (net.minecraft.item.Item item : FFDItems.WOOD_ITEMS) {
+                registerOre("logWood", item);
+            }
             for (net.minecraft.item.Item item : FFDItems.STRIPPED_LOG_ITEMS) {
                 registerOre("logWood", item);
             }
@@ -964,8 +995,18 @@ public final class FFDRegistryEvents {
             registerOre("oreCopper", FFDItems.COPPER_ORE);
             registerOre("ingotCopper", FFDItems.COPPER_INGOT);
             registerRawOreDictionary(true);
-            registerOre("blockCopper", FFDItems.COPPER_BLOCK);
-            registerOre("blockCopperCut", FFDItems.CUT_COPPER);
+            for (net.minecraft.item.Item item : FFDItems.COPPER_BLOCK_ITEMS) {
+                registerOre("blockCopper", item);
+            }
+            for (net.minecraft.item.Item item : FFDItems.WAXED_COPPER_BLOCK_ITEMS) {
+                registerOre("blockCopper", item);
+            }
+            for (net.minecraft.item.Item item : FFDItems.CUT_COPPER_ITEMS) {
+                registerOre("blockCopperCut", item);
+            }
+            for (net.minecraft.item.Item item : FFDItems.WAXED_CUT_COPPER_ITEMS) {
+                registerOre("blockCopperCut", item);
+            }
             if (FFDItems.isDeepslateEnabled()) {
                 registerOre("oreCopper", FFDItems.DEEPSLATE_COPPER_ORE);
             }
@@ -1191,6 +1232,18 @@ public final class FFDRegistryEvents {
             ItemStack strippedLog = FFDItems.effectiveStack(FFDItems.STRIPPED_LOG_ITEMS[i]);
             ItemStack strippedWood = FFDItems.effectiveStack(FFDItems.STRIPPED_WOOD_ITEMS[i]);
             String wood = FFDBlocks.OVERWORLD_WOOD_NAMES[i];
+            if (FFDItems.isItemRegistered(FFDItems.WOOD_ITEMS[i])) {
+                ItemStack log = new ItemStack(i < 4 ? net.minecraft.init.Blocks.LOG
+                        : net.minecraft.init.Blocks.LOG2, 1, i < 4 ? i : i - 4);
+                recipes.add(new ShapedOreRecipe(group, new ItemStack(FFDItems.WOOD_ITEMS[i], 3),
+                        "LL", "LL", 'L', log)
+                        .setRegistryName(FarmerFutureDelight.MODID, wood + "_wood"));
+                recipes.add(new ShapelessOreRecipe(group,
+                        new ItemStack(net.minecraft.init.Blocks.PLANKS, 4, i),
+                        new ItemStack(FFDItems.WOOD_ITEMS[i]))
+                        .setRegistryName(FarmerFutureDelight.MODID,
+                                "planks_from_" + wood + "_wood"));
+            }
             if (FFDItems.isItemRegistered(FFDItems.STRIPPED_WOOD_ITEMS[i])
                     && !strippedLog.isEmpty()) {
                 recipes.add(new ShapedOreRecipe(group,

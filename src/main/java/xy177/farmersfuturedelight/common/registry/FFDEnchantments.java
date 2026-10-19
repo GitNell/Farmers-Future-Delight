@@ -7,8 +7,6 @@ import net.minecraft.enchantment.EnchantmentDamage;
 import net.minecraft.enchantment.EnchantmentHelper;
 import net.minecraft.enchantment.EnumEnchantmentType;
 import net.minecraft.entity.EntityLivingBase;
-import net.minecraft.entity.monster.EntityGuardian;
-import net.minecraft.entity.passive.EntityWaterMob;
 import net.minecraft.inventory.EntityEquipmentSlot;
 import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
@@ -18,9 +16,6 @@ import net.minecraftforge.registries.IForgeRegistry;
 import xy177.farmersfuturedelight.FarmerFutureDelight;
 import xy177.farmersfuturedelight.common.FFDCompat;
 import xy177.farmersfuturedelight.common.FFDConfig;
-import xy177.farmersfuturedelight.common.entity.EntityAxolotl;
-import xy177.farmersfuturedelight.common.entity.EntityDolphin;
-import xy177.farmersfuturedelight.common.entity.EntityTurtle;
 
 public final class FFDEnchantments {
     private static final EnumEnchantmentType TRIDENT_TYPE = EnumHelper.addEnchantmentType(
@@ -72,26 +67,15 @@ public final class FFDEnchantments {
     }
 
     public static float getImpalingDamage(ItemStack stack, EntityLivingBase target) {
-        return isAquatic(target) ? getImpaling(stack) * 2.5F : 0.0F;
+        return isImpalingDamageTarget(target) ? getImpaling(stack) * 2.5F : 0.0F;
+    }
+
+    public static boolean isImpalingDamageTarget(EntityLivingBase entity) {
+        return FFDConfig.isConfiguredEntity(FFDConfig.impalingDamageMobs, entity);
     }
 
     public static boolean isAquatic(EntityLivingBase entity) {
-        if (entity instanceof EntityWaterMob || entity instanceof EntityGuardian
-                || entity instanceof EntityDolphin || entity instanceof EntityTurtle
-                || entity instanceof EntityAxolotl) {
-            return true;
-        }
-        ResourceLocation id = net.minecraft.entity.EntityList.getKey(entity);
-        if (id == null) {
-            return false;
-        }
-        String path = id.getResourcePath();
-        return "guardian".equals(path) || "elder_guardian".equals(path)
-                || "squid".equals(path) || "glow_squid".equals(path)
-                || "cod".equals(path) || "salmon".equals(path)
-                || "pufferfish".equals(path) || "puffer_fish".equals(path)
-                || "tropical_fish".equals(path) || "dolphin".equals(path)
-                || "turtle".equals(path) || "axolotl".equals(path);
+        return isImpalingDamageTarget(entity);
     }
 
     public static boolean isTridentEnchantment(Enchantment enchantment) {

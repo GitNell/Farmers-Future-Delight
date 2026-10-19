@@ -34,6 +34,7 @@ public final class WorldGenAmethystGeodes {
     private static final int CRACK_POINT_OFFSET = 2;
     private static final double NOISE_MULTIPLIER = 0.05D;
     private static final long FEATURE_SALT = 0x4F9939F508L;
+    private static final int LEGACY_SHAPE_CACHE_SIZE = 16;
     private static final EnumFacing[] DIRECTIONS = EnumFacing.values();
 
     private final long worldSeed;
@@ -45,6 +46,13 @@ public final class WorldGenAmethystGeodes {
     private final IBlockState calcite;
     private final IBlockState smoothBasalt;
     private final IBlockState[] crystals;
+    private final Map<Long, GeodeShape> legacyShapes = new LinkedHashMap<Long, GeodeShape>(
+            LEGACY_SHAPE_CACHE_SIZE, 0.75F, true) {
+        @Override
+        protected boolean removeEldestEntry(Map.Entry<Long, GeodeShape> eldest) {
+            return size() > LEGACY_SHAPE_CACHE_SIZE;
+        }
+    };
 
     public WorldGenAmethystGeodes(long worldSeed) {
         this.worldSeed = worldSeed;
@@ -65,6 +73,12 @@ public final class WorldGenAmethystGeodes {
     }
 
     public void generateChunk(int targetChunkX, int targetChunkZ, Access access) {
+        generateChunk(targetChunkX, targetChunkZ, access, FFDConfig.amethystGeodeMinY,
+                FFDConfig.amethystGeodeMaxY, true);
+    }
+
+    public void generateChunk(int targetChunkX, int targetChunkZ, Access access,
+                              int minimumY, int maximumY, boolean validatePoints) {
         if (!hasRequiredBlocks()) {
             return;
         }
@@ -76,15 +90,16 @@ public final class WorldGenAmethystGeodes {
                 }
                 int originX = (sourceChunkX << 4) + random.nextInt(16);
                 int originZ = (sourceChunkZ << 4) + random.nextInt(16);
-                int originY = between(random, FFDConfig.amethystGeodeMinY,
-                        FFDConfig.amethystGeodeMaxY);
+                int originY = between(random, minimumY, maximumY);
                 BlockPos origin = new BlockPos(originX, originY, originZ);
-                place(origin, random, access);
+                long sourceKey = ((long) sourceChunkX << 32) | (sourceChunkZ & 0xFFFFFFFFL);
+                place(origin, random, access, validatePoints, sourceKey);
             }
         }
     }
 
-    private void place(BlockPos origin, Random random, Access access) {
+    private void place(BlockPos origin, Random random, Access access,
+                       boolean validatePoints, long sourceKey) {
         int pointCount = between(random, FFDConfig.amethystGeodeDistributionMin,
                 FFDConfig.amethystGeodeDistributionMax);
         double layerAdjustment = pointCount / (double) FFDConfig.amethystGeodeOuterWallMax;
@@ -106,7 +121,8 @@ public final class WorldGenAmethystGeodes {
                             FFDConfig.amethystGeodeOuterWallMax),
                     between(random, FFDConfig.amethystGeodeOuterWallMin,
                             FFDConfig.amethystGeodeOuterWallMax));
-            if (isInvalid(access.getState(pointPos)) && ++invalidPoints > INVALID_BLOCK_THRESHOLD) {
+            if (validatePoints && isInvalid(access.getState(pointPos))
+                    && ++invalidPoints > INVALID_BLOCK_THRESHOLD) {
                 return;
             }
             points.add(new Point(pointPos, between(random, FFDConfig.amethystGeodePointOffsetMin,
@@ -132,23 +148,33 @@ public final class WorldGenAmethystGeodes {
             }
         }
 
+        GeodeShape shape = validatePoints ? null : legacyShape(
+                sourceKey, origin, points, crackPoints, basaltLayer);
         Map<BlockPos, IBlockState> staged = new LinkedHashMap<>();
         Set<BlockPos> openedCracks = new HashSet<>();
         List<BlockPos> potentialCrystals = new ArrayList<>();
+        int index = 0;
         for (int x = origin.getX() - SCAN_RADIUS; x <= origin.getX() + SCAN_RADIUS; x++) {
             for (int y = origin.getY() - SCAN_RADIUS; y <= origin.getY() + SCAN_RADIUS; y++) {
                 for (int z = origin.getZ() - SCAN_RADIUS; z <= origin.getZ() + SCAN_RADIUS; z++) {
-                    BlockPos pos = new BlockPos(x, y, z);
-                    double noise = shapeNoise.sample(x, y, z) * NOISE_MULTIPLIER;
-                    double shellPotential = potential(pos, points, noise);
+                    int sampleIndex = index++;
+                    BlockPos pos = shape == null ? new BlockPos(x, y, z) : null;
+                    double noise = shape == null ? shapeNoise.sample(x, y, z) * NOISE_MULTIPLIER : 0.0D;
+                    double shellPotential = shape == null
+                            ? potential(pos, points, noise) : shape.shell[sampleIndex];
                     if (shellPotential < basaltLayer) {
                         continue;
+                    }
+                    if (pos == null) {
+                        pos = new BlockPos(x, y, z);
                     }
                     if (shellPotential >= innerAir) {
                         stage(access, staged, pos, Blocks.AIR.getDefaultState());
                         continue;
                     }
-                    if (generateCrack && potential(pos, crackPoints, CRACK_POINT_OFFSET, noise) >= crackSize) {
+                    if (generateCrack && (shape == null
+                            ? potential(pos, crackPoints, CRACK_POINT_OFFSET, noise)
+                            : shape.cracks[sampleIndex]) >= crackSize) {
                         stage(access, staged, pos, Blocks.AIR.getDefaultState());
                         openedCracks.add(pos);
                         continue;
@@ -169,6 +195,10 @@ public final class WorldGenAmethystGeodes {
         }
 
         for (BlockPos supportPos : potentialCrystals) {
+            if (!validatePoints && (!access.isTargetChunk(supportPos)
+                    || stateAt(access, staged, supportPos).getBlock() != buddingAmethyst.getBlock())) {
+                continue;
+            }
             IBlockState crystal = crystal(random.nextInt(4));
             if (crystal == null) {
                 continue;
@@ -189,6 +219,34 @@ public final class WorldGenAmethystGeodes {
         }
 
         commit(access, staged, openedCracks);
+    }
+
+    private GeodeShape legacyShape(long sourceKey, BlockPos origin, List<Point> points,
+                                   List<BlockPos> crackPoints, double basaltLayer) {
+        GeodeShape shape = legacyShapes.get(sourceKey);
+        if (shape != null && shape.matches(origin, points, crackPoints, basaltLayer)) {
+            return shape;
+        }
+        int length = (SCAN_RADIUS * 2 + 1) * (SCAN_RADIUS * 2 + 1) * (SCAN_RADIUS * 2 + 1);
+        double[] shell = new double[length];
+        double[] cracks = crackPoints.isEmpty() ? null : new double[length];
+        int index = 0;
+        for (int x = origin.getX() - SCAN_RADIUS; x <= origin.getX() + SCAN_RADIUS; x++) {
+            for (int y = origin.getY() - SCAN_RADIUS; y <= origin.getY() + SCAN_RADIUS; y++) {
+                for (int z = origin.getZ() - SCAN_RADIUS; z <= origin.getZ() + SCAN_RADIUS; z++) {
+                    BlockPos pos = new BlockPos(x, y, z);
+                    double noise = shapeNoise.sample(x, y, z) * NOISE_MULTIPLIER;
+                    shell[index] = potential(pos, points, noise);
+                    if (cracks != null && shell[index] >= basaltLayer) {
+                        cracks[index] = potential(pos, crackPoints, CRACK_POINT_OFFSET, noise);
+                    }
+                    index++;
+                }
+            }
+        }
+        shape = new GeodeShape(origin, points, crackPoints, basaltLayer, shell, cracks);
+        legacyShapes.put(sourceKey, shape);
+        return shape;
     }
 
     private static void commit(Access access, Map<BlockPos, IBlockState> staged,
@@ -370,6 +428,41 @@ public final class WorldGenAmethystGeodes {
         private Point(BlockPos pos, int offset) {
             this.pos = pos;
             this.offset = offset;
+        }
+    }
+
+    private static final class GeodeShape {
+        private final BlockPos origin;
+        private final List<Point> points;
+        private final List<BlockPos> crackPoints;
+        private final double basaltLayer;
+        private final double[] shell;
+        private final double[] cracks;
+
+        private GeodeShape(BlockPos origin, List<Point> points, List<BlockPos> crackPoints,
+                           double basaltLayer, double[] shell, double[] cracks) {
+            this.origin = origin;
+            this.points = points;
+            this.crackPoints = crackPoints;
+            this.basaltLayer = basaltLayer;
+            this.shell = shell;
+            this.cracks = cracks;
+        }
+
+        private boolean matches(BlockPos candidateOrigin, List<Point> candidatePoints,
+                                List<BlockPos> candidateCracks, double candidateBasaltLayer) {
+            if (!origin.equals(candidateOrigin) || basaltLayer != candidateBasaltLayer
+                    || points.size() != candidatePoints.size()
+                    || !crackPoints.equals(candidateCracks)) {
+                return false;
+            }
+            for (int index = 0; index < points.size(); index++) {
+                if (!points.get(index).pos.equals(candidatePoints.get(index).pos)
+                        || points.get(index).offset != candidatePoints.get(index).offset) {
+                    return false;
+                }
+            }
+            return true;
         }
     }
 }

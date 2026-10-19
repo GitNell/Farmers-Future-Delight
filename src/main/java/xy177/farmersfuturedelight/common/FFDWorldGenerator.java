@@ -35,6 +35,7 @@ import xy177.farmersfuturedelight.common.registry.FFDItems;
 import xy177.farmersfuturedelight.common.tile.TileEntityBeehive;
 import xy177.farmersfuturedelight.common.worldgen.WorldGenCoralReefs;
 import xy177.farmersfuturedelight.common.worldgen.WorldGenModernIcebergs;
+import xy177.farmersfuturedelight.common.worldgen.WorldGenLegacyAmethystGeodes;
 import xy177.farmersfuturedelight.common.worldgen.FFDOceanStructures;
 import xy177.farmersfuturedelight.common.worldgen.BeeNestLeaves;
 import xy177.farmersfuturedelight.core.FFDHeightHooks;
@@ -43,6 +44,7 @@ public class FFDWorldGenerator implements IWorldGenerator {
     private static final int WORLDGEN_FLAGS = 2 | 16;
     private static final NoiseGeneratorPerlin KELP_NOISE =
             new NoiseGeneratorPerlin(new Random(2345L), 1);
+    private final WorldGenLegacyAmethystGeodes legacyGeodes = new WorldGenLegacyAmethystGeodes();
 
     @Override
     public void generate(Random random, int chunkX, int chunkZ, World world,
@@ -58,6 +60,7 @@ public class FFDWorldGenerator implements IWorldGenerator {
             FFDOceanStructures.generate(world, chunkX, chunkZ);
             if (!FFDHeightHooks.isExtended(world)) {
                 new WorldGenModernIcebergs(world.getSeed()).generate(world, chunkX, chunkZ);
+                legacyGeodes.generate(world, chunkX, chunkZ);
             }
             if (FFDItems.isBlockRegistered(FFDBlocks.SWEET_BERRY_BUSH)
                     && BiomeDictionary.hasType(biome, BiomeDictionary.Type.CONIFEROUS)) {

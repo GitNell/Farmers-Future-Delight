@@ -229,10 +229,8 @@ public final class FFDModernBiomeResolver {
             return false;
         }
 
-        boolean badlands = sample.biome == ModernBiome.BADLANDS
-                || sample.biome == ModernBiome.WOODED_BADLANDS
-                || sample.biome == ModernBiome.ERODED_BADLANDS;
-        if (badlands != BiomeDictionary.hasType(candidate, BiomeDictionary.Type.MESA)) {
+        if (!isIceAndFireGlacier(candidate)
+                && !FFDBiomeCandidateSelector.hasCompatibleFamily(sample, candidate)) {
             return false;
         }
 
@@ -494,6 +492,7 @@ public final class FFDModernBiomeResolver {
                 case RIVER: return Biomes.RIVER;
                 case JAGGED_PEAKS:
                 case STONY_PEAKS:
+                case WINDSWEPT_GRAVELLY_HILLS:
                 case WINDSWEPT_HILLS:
                 case WINDSWEPT_FOREST: return Biomes.EXTREME_HILLS;
                 case FROZEN_PEAKS:

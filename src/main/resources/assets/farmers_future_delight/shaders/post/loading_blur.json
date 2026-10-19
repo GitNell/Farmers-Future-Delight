@@ -1,37 +1,11 @@
 {
-  "targets": [
-    "swap"
-  ],
+  "targets": ["swap"],
   "passes": [
-    {
-      "name": "blur",
-      "intarget": "minecraft:main",
-      "outtarget": "swap",
-      "uniforms": [
-        {
-          "name": "BlurDir",
-          "values": [1.0, 0.0]
-        },
-        {
-          "name": "Radius",
-          "values": [10.0]
-        }
-      ]
-    },
-    {
-      "name": "blur",
-      "intarget": "swap",
-      "outtarget": "minecraft:main",
-      "uniforms": [
-        {
-          "name": "BlurDir",
-          "values": [0.0, 1.0]
-        },
-        {
-          "name": "Radius",
-          "values": [10.0]
-        }
-      ]
-    }
+    {"name": "farmers_future_delight:loading_box_blur", "intarget": "minecraft:main", "outtarget": "swap", "uniforms": [{"name": "BlurDir", "values": [1, 0]}]},
+    {"name": "farmers_future_delight:loading_box_blur", "intarget": "swap", "outtarget": "minecraft:main", "uniforms": [{"name": "BlurDir", "values": [0, 1]}]},
+    {"name": "farmers_future_delight:loading_box_blur", "intarget": "minecraft:main", "outtarget": "swap", "uniforms": [{"name": "BlurDir", "values": [1, 0]}]},
+    {"name": "farmers_future_delight:loading_box_blur", "intarget": "swap", "outtarget": "minecraft:main", "uniforms": [{"name": "BlurDir", "values": [0, 1]}]},
+    {"name": "farmers_future_delight:loading_box_blur", "intarget": "minecraft:main", "outtarget": "swap", "uniforms": [{"name": "BlurDir", "values": [1, 0]}]},
+    {"name": "farmers_future_delight:loading_box_blur", "intarget": "swap", "outtarget": "minecraft:main", "uniforms": [{"name": "BlurDir", "values": [0, 1]}]}
   ]
 }

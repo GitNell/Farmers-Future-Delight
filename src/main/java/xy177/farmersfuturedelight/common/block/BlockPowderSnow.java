@@ -16,12 +16,10 @@ import net.minecraft.entity.Entity;
 import net.minecraft.entity.EntityLiving;
 import net.minecraft.entity.EntityLivingBase;
 import net.minecraft.entity.item.EntityFallingBlock;
-import net.minecraft.entity.monster.EntityEndermite;
-import net.minecraft.entity.monster.EntitySilverfish;
-import net.minecraft.entity.passive.EntityRabbit;
 import net.minecraft.init.Blocks;
 import net.minecraft.init.Items;
 import net.minecraft.item.Item;
+import net.minecraft.pathfinding.PathNodeType;
 import net.minecraft.util.BlockRenderLayer;
 import net.minecraft.util.EnumFacing;
 import net.minecraft.util.EnumParticleTypes;
@@ -54,6 +52,11 @@ public class BlockPowderSnow extends Block {
     }
 
     @Override
+    public boolean isReplaceable(IBlockAccess world, BlockPos pos) {
+        return false;
+    }
+
+    @Override
     public void addCollisionBoxToList(IBlockState state, World world, BlockPos pos,
                                       AxisAlignedBB entityBox, List<AxisAlignedBB> boxes,
                                       @Nullable Entity entity, boolean actualState) {
@@ -75,8 +78,7 @@ public class BlockPowderSnow extends Block {
     }
 
     public static boolean canEntityWalkOnPowderSnow(Entity entity) {
-        if (entity instanceof EntityRabbit || entity instanceof EntityEndermite
-                || entity instanceof EntitySilverfish) {
+        if (xy177.farmersfuturedelight.common.FFDPowderSnowEvents.isWalkableMob(entity)) {
             return true;
         }
         return entity instanceof EntityLivingBase
@@ -205,6 +207,14 @@ public class BlockPowderSnow extends Block {
     @Override
     public boolean isPassable(IBlockAccess world, BlockPos pos) {
         return true;
+    }
+
+    @Nullable
+    @Override
+    public PathNodeType getAiPathNodeType(IBlockState state, IBlockAccess world, BlockPos pos,
+                                          @Nullable EntityLiving entity) {
+        return entity != null && canEntityWalkOnPowderSnow(entity) && !entity.isSneaking()
+                ? PathNodeType.BLOCKED : null;
     }
 
     @Override

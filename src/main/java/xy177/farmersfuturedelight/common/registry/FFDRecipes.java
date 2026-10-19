@@ -3,6 +3,8 @@ package xy177.farmersfuturedelight.common.registry;
 import net.minecraft.item.ItemStack;
 import net.minecraft.init.Items;
 import net.minecraft.item.EnumDyeColor;
+import net.minecraft.item.Item;
+import net.minecraft.item.crafting.FurnaceRecipes;
 import net.minecraftforge.fml.common.registry.GameRegistry;
 import xy177.farmersfuturedelight.common.FFDCompat;
 import xy177.farmersfuturedelight.common.FFDConfig;
@@ -15,6 +17,25 @@ public final class FFDRecipes {
     public static void init() {
         FFDRawOreOreDictionaryCompat.register();
         FFDRawOreCompat.registerCraftingRecipes();
+        if (FFDItems.isStrippedWoodEnabled()) {
+            ItemStack charcoal = new ItemStack(Items.COAL, 1, 1);
+            for (Item wood : FFDItems.WOOD_ITEMS) {
+                addSmelting(wood, charcoal, 0.15F);
+            }
+            for (Item log : FFDItems.STRIPPED_LOG_ITEMS) {
+                addSmelting(log, charcoal, 0.15F);
+            }
+            for (Item wood : FFDItems.STRIPPED_WOOD_ITEMS) {
+                addSmelting(wood, charcoal, 0.15F);
+            }
+            for (FFDCustomStrippedWoods.Entry entry : FFDCustomStrippedWoods.entries()) {
+                ItemStack sourceOutput = FurnaceRecipes.instance().getSmeltingResult(entry.sourceStack());
+                if (ItemStack.areItemsEqual(sourceOutput, charcoal)) {
+                    addSmelting(entry.logItem(), charcoal, 0.15F);
+                    addSmelting(entry.woodItem(), charcoal, 0.15F);
+                }
+            }
+        }
         if (FFDItems.isKelpEnabled()) {
             addSmelting(FFDItems.KELP, FFDItems.DRIED_KELP, 0.1F);
         }
@@ -68,7 +89,7 @@ public final class FFDRecipes {
 
     private static void addSmelting(net.minecraft.item.Item input,
                                     ItemStack output, float experience) {
-        if (FFDItems.isItemRegistered(input) && output != null && !output.isEmpty()) {
+        if (input != null && FFDItems.isItemRegistered(input) && output != null && !output.isEmpty()) {
             GameRegistry.addSmelting(new ItemStack(input), output, experience);
         }
     }

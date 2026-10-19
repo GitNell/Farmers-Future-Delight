@@ -46,6 +46,7 @@ import net.minecraft.world.EnumSkyBlock;
 import net.minecraft.world.GameRules;
 import net.minecraft.world.biome.Biome;
 import net.minecraft.util.SoundCategory;
+import net.minecraft.util.SoundEvent;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.RayTraceResult;
 import net.minecraft.util.math.AxisAlignedBB;
@@ -127,6 +128,8 @@ public final class FFDGameplayEvents {
             FarmerFutureDelight.MODID + ".drownedSubmergedTicks";
     private static final String DROWNED_CONVERSION_TICKS_TAG =
             FarmerFutureDelight.MODID + ".drownedConversionTicks";
+    public static final String DROWNED_CONVERTING_TAG =
+            FarmerFutureDelight.MODID + ".drownedConverting";
     private static final double SLOW_FALLING_GRAVITY_COMPENSATION = 0.08D - 0.01D;
     private static Biome.SpawnListEntry dripstoneDrownedSpawn;
 
@@ -490,14 +493,18 @@ public final class FFDGameplayEvents {
 
         TileEntitySign sign = (TileEntitySign) tile;
         boolean changed;
+        SoundEvent sound;
         if (glowInk) {
             changed = FFDSignText.setGlowing(sign, true);
+            sound = FFDSounds.GLOW_INK_SAC_USE;
         } else if (held.getMetadata() == EnumDyeColor.BLACK.getDyeDamage()
                 && FFDSignText.isGlowing(sign)) {
             changed = FFDSignText.setGlowing(sign, false);
+            sound = FFDSounds.INK_SAC_USE;
         } else {
             changed = FFDSignText.applyDye(sign,
                     EnumDyeColor.byDyeDamage(held.getMetadata()));
+            sound = FFDSounds.DYE_USE;
         }
         if (!changed) {
             return;
@@ -507,7 +514,7 @@ public final class FFDGameplayEvents {
                 event.getWorld().getBlockState(event.getPos()),
                 event.getWorld().getBlockState(event.getPos()), 3);
         event.getWorld().playSound(null, event.getPos(),
-                SoundEvents.BLOCK_ENCHANTMENT_TABLE_USE, SoundCategory.BLOCKS, 1.0F, 1.0F);
+                sound, SoundCategory.BLOCKS, 1.0F, 1.0F);
         if (!event.getEntityPlayer().capabilities.isCreativeMode) {
             held.shrink(1);
         }
@@ -681,29 +688,35 @@ public final class FFDGameplayEvents {
 
     @SubscribeEvent
     public static void onZombieDrownedConversion(LivingUpdateEvent event) {
-        if (!FFDEntities.isLocalDrownedEnabled()
-                || event.getEntityLiving().world.isRemote
-                || !(event.getEntityLiving() instanceof EntityZombie)
-                || !FFDConfig.isConfiguredEntity(FFDConfig.drownedTransformationMobs,
-                        event.getEntityLiving())) {
+        if (event.getEntityLiving().world.isRemote) {
             return;
         }
-        EntityZombie zombie = (EntityZombie) event.getEntityLiving();
-        if (!zombie.isEntityAlive() || zombie.isAIDisabled()) {
+        EntityLivingBase source = event.getEntityLiving();
+        if (!source.isEntityAlive()
+                || source instanceof net.minecraft.entity.EntityLiving
+                && ((net.minecraft.entity.EntityLiving) source).isAIDisabled()) {
             return;
         }
-        net.minecraft.nbt.NBTTagCompound data = zombie.getEntityData();
-        if (!zombie.isInsideOfMaterial(Material.WATER)) {
+        ResourceLocation targetId = FFDConfig.getDrownedTransformationTarget(source);
+        if (targetId == null || FFDEntities.DROWNED_ID.equals(targetId)
+                && !FFDEntities.isLocalDrownedEnabled()) {
+            syncDrownedConverting(source, false);
+            return;
+        }
+        net.minecraft.nbt.NBTTagCompound data = source.getEntityData();
+        if (!source.isInsideOfMaterial(Material.WATER)) {
             data.setInteger(DROWNED_SUBMERGED_TICKS_TAG, -1);
             data.removeTag(DROWNED_CONVERSION_TICKS_TAG);
+            syncDrownedConverting(source, false);
             return;
         }
         if (data.hasKey(DROWNED_CONVERSION_TICKS_TAG, 3)) {
+            syncDrownedConverting(source, true);
             int conversionTicks = data.getInteger(DROWNED_CONVERSION_TICKS_TAG) - 1;
             if (conversionTicks < 0) {
-                if (EntityDrowned.convertFrom(zombie)) {
-                    if (!zombie.isSilent()) {
-                        zombie.world.playSound(null, new BlockPos(zombie),
+                if (EntityDrowned.convertFrom(source, targetId)) {
+                    if (!source.isSilent()) {
+                        source.world.playSound(null, new BlockPos(source),
                                 FFDSounds.ZOMBIE_CONVERTED_TO_DROWNED,
                                 SoundCategory.HOSTILE, 1.0F, 1.0F);
                     }
@@ -719,6 +732,28 @@ public final class FFDGameplayEvents {
         data.setInteger(DROWNED_SUBMERGED_TICKS_TAG, submergedTicks);
         if (submergedTicks >= 600) {
             data.setInteger(DROWNED_CONVERSION_TICKS_TAG, 300);
+            syncDrownedConverting(source, true);
+        } else {
+            syncDrownedConverting(source, false);
+        }
+    }
+
+    private static void syncDrownedConverting(EntityLivingBase entity, boolean converting) {
+        if (entity.getEntityData().getBoolean(DROWNED_CONVERTING_TAG) != converting) {
+            entity.getEntityData().setBoolean(DROWNED_CONVERTING_TAG, converting);
+            xy177.farmersfuturedelight.common.network.FFDNetwork
+                    .sendDrownedConverting(entity, converting);
+        }
+    }
+
+    @SubscribeEvent
+    public static void onTrackDrownedConversion(PlayerEvent.StartTracking event) {
+        if (event.getEntityPlayer() instanceof net.minecraft.entity.player.EntityPlayerMP
+                && event.getTarget() instanceof EntityLivingBase) {
+            xy177.farmersfuturedelight.common.network.FFDNetwork.sendDrownedConverting(
+                    (net.minecraft.entity.player.EntityPlayerMP) event.getEntityPlayer(),
+                    (EntityLivingBase) event.getTarget(),
+                    event.getTarget().getEntityData().getBoolean(DROWNED_CONVERTING_TAG));
         }
     }
 
@@ -1072,7 +1107,16 @@ public final class FFDGameplayEvents {
             return strippedState(FFDItems.effectiveBlock(FFDBlocks.STRIPPED_WARPED_HYPHAE),
                     state.getValue(BlockRotatedPillar.AXIS));
         }
-        if (!FFDItems.isStrippedWoodEnabled() || block != Blocks.LOG && block != Blocks.LOG2) {
+        if (!FFDItems.isStrippedWoodEnabled()) {
+            return null;
+        }
+        for (int index = 0; index < FFDBlocks.WOODS.length; index++) {
+            if (block == FFDBlocks.WOODS[index]) {
+                return strippedState(FFDItems.effectiveBlock(FFDBlocks.STRIPPED_WOODS[index]),
+                        state.getValue(BlockRotatedPillar.AXIS));
+            }
+        }
+        if (block != Blocks.LOG && block != Blocks.LOG2) {
             return null;
         }
         int metadata = block.getMetaFromState(state);

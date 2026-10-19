@@ -1,6 +1,7 @@
 package xy177.farmersfuturedelight.common.worldgen;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Random;
@@ -74,8 +75,10 @@ public final class MapGenLushCaves extends MapGenBase {
         List<Cavern> caverns = Collections.emptyList();
         if (FFDItems.isLushCaveEnabled()) {
             caverns = collectIntersectingCaverns(worldIn.getSeed(), chunkX, chunkZ);
+            int[] roofLimits = new int[256];
+            Arrays.fill(roofLimits, -1);
             for (Cavern cavern : caverns) {
-                carveCavern(primer, chunkX, chunkZ, cavern);
+                carveCavern(primer, chunkX, chunkZ, cavern, roofLimits);
             }
         }
         if (FFDItems.isGlowLichenEnabled()) {
@@ -141,7 +144,8 @@ public final class MapGenLushCaves extends MapGenBase {
         return caverns;
     }
 
-    private static void carveCavern(ChunkPrimer primer, int chunkX, int chunkZ, Cavern cavern) {
+    private static void carveCavern(ChunkPrimer primer, int chunkX, int chunkZ,
+                                   Cavern cavern, int[] roofLimits) {
         if (!cavern.carvingIntersectsChunk(chunkX, chunkZ)) {
             return;
         }
@@ -157,8 +161,19 @@ public final class MapGenLushCaves extends MapGenBase {
             int localX = worldX - chunkMinX;
             for (int worldZ = startZ; worldZ <= endZ; worldZ++) {
                 int localZ = worldZ - chunkMinZ;
+                int column = (localX << 4) | localZ;
+                boolean covered = roofLimits[column] < 0 && endY <= 250
+                        && primer.getBlockState(localX, endY + 5, localZ)
+                        .getMaterial().isSolid();
                 for (int y = startY; y <= endY; y++) {
-                    if (!cavern.shouldCarve(worldX + 0.5D, y + 0.5D, worldZ + 0.5D)) {
+                    if ((!covered && roofLimits[column] >= 0 && y > roofLimits[column])
+                            || !cavern.shouldCarve(worldX + 0.5D, y + 0.5D, worldZ + 0.5D)) {
+                        continue;
+                    }
+                    if (!covered && roofLimits[column] < 0) {
+                        roofLimits[column] = findOceanFloor(primer, localX, localZ) - 5;
+                    }
+                    if (!covered && y > roofLimits[column]) {
                         continue;
                     }
                     IBlockState state = primer.getBlockState(localX, y, localZ);

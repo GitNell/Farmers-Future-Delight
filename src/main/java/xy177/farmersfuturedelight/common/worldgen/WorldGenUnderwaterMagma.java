@@ -40,7 +40,7 @@ public final class WorldGenUnderwaterMagma {
             int x = startX + random.nextInt(16);
             int z = startZ + random.nextInt(16);
             int y = MIN_Y + random.nextInt(MAX_Y - MIN_Y + 1);
-            if (y > access.surfaceY(x, z) - 2) {
+            if (!access.isBelowSurface(x, y, z)) {
                 continue;
             }
             placeAt(x, y, z, targetChunkX, targetChunkZ, access, random);
@@ -134,6 +134,10 @@ public final class WorldGenUnderwaterMagma {
         void setState(int x, int y, int z, IBlockState state);
 
         int surfaceY(int x, int z);
+
+        default boolean isBelowSurface(int x, int y, int z) {
+            return y <= surfaceY(x, z) - 2;
+        }
 
         BlockFaceShape getFaceShape(int x, int y, int z, EnumFacing face);
     }

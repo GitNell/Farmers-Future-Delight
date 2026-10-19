@@ -4,6 +4,7 @@ import java.lang.reflect.Method;
 import java.util.List;
 
 import net.minecraft.init.Items;
+import net.minecraft.init.Blocks;
 import net.minecraft.item.EnumDyeColor;
 import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
@@ -30,10 +31,14 @@ public final class FFDFutureMcRecipes {
                     "thedarkcolour.futuremc.recipe.stonecutter.StonecutterRecipes");
             RecipeApi blastFurnace = RecipeApi.open(
                     "thedarkcolour.futuremc.recipe.furnace.BlastFurnaceRecipes");
+            RecipeApi smoker = RecipeApi.open(
+                    "thedarkcolour.futuremc.recipe.furnace.SmokerRecipes");
             int stonecutterRecipes = registerStonecutterRecipes(stonecutter);
             int blastFurnaceRecipes = registerBlastFurnaceRecipes(blastFurnace);
-            LOGGER.info("Registered {} Future MC stonecutter recipes and {} blast furnace recipes",
-                    stonecutterRecipes, blastFurnaceRecipes);
+            int smokerRecipes = FFDItems.isKelpEnabled()
+                    ? addIfLocalOutput(smoker, FFDItems.KELP, FFDItems.DRIED_KELP, 1) : 0;
+            LOGGER.info("Registered {} Future MC stonecutter recipes, {} blast furnace recipes and {} smoker recipes",
+                    stonecutterRecipes, blastFurnaceRecipes, smokerRecipes);
         } catch (ReflectiveOperationException | LinkageError | RuntimeException exception) {
             LOGGER.warn("Could not register optional Future MC recipes", exception);
         }
@@ -42,6 +47,17 @@ public final class FFDFutureMcRecipes {
     private static int registerStonecutterRecipes(RecipeApi api)
             throws ReflectiveOperationException {
         int added = 0;
+        if (FFDItems.isPrismarineDecorEnabled()) {
+            for (int index = 0; index < FFDItems.PRISMARINE_STAIR_ITEMS.length; index++) {
+                ItemStack input = new ItemStack(Blocks.PRISMARINE, 1, index);
+                if (FFDItems.isItemRegistered(FFDItems.PRISMARINE_STAIR_ITEMS[index])) {
+                    added += api.add(input, new ItemStack(FFDItems.PRISMARINE_STAIR_ITEMS[index]));
+                }
+                if (FFDItems.isItemRegistered(FFDItems.PRISMARINE_SLAB_ITEMS[index])) {
+                    added += api.add(input, new ItemStack(FFDItems.PRISMARINE_SLAB_ITEMS[index], 2));
+                }
+            }
+        }
         if (FFDItems.isDeepslateEnabled()) {
             Item[] blocks = {
                     FFDItems.COBBLED_DEEPSLATE,

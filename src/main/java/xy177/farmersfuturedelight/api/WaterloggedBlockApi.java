@@ -93,7 +93,8 @@ public final class WaterloggedBlockApi {
     }
 
     public static synchronized void registerRenderedBlock(Block block) {
-        if (FFDConfig.isWaterloggingEnabled() && block != null) {
+        if (block != null && (block instanceof IWaterloggableBlock
+                || FFDConfig.isWaterloggingEnabled())) {
             RENDERED_BLOCKS.add(block);
         }
     }
@@ -103,7 +104,8 @@ public final class WaterloggedBlockApi {
     }
 
     public static synchronized void registerWaterColorBlock(Block block) {
-        if (FFDConfig.isWaterloggingEnabled() && block != null) {
+        if (block != null && (block instanceof IWaterloggableBlock
+                || FFDConfig.isWaterloggingEnabled())) {
             WATER_COLOR_BLOCKS.add(block);
         }
     }

@@ -141,6 +141,9 @@ public class EntityTropicalFish extends EntitySchoolingFish {
     protected void writeToBucket(ItemStack bucket) {
         super.writeToBucket(bucket);
         bucket.setTagInfo("BucketVariantTag", new net.minecraft.nbt.NBTTagInt(getVariant()));
+        if (bucket.getItem() instanceof net.minecraft.item.ItemMonsterPlacer) {
+            bucket.getOrCreateSubCompound("EntityTag").setInteger("Variant", getVariant());
+        }
     }
 
     @Override

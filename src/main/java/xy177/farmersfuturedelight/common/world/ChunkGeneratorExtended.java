@@ -379,6 +379,14 @@ public final class ChunkGeneratorExtended extends ChunkGeneratorOverworld {
             }
 
             @Override
+            public boolean isBelowSurface(int x, int y, int z) {
+                int sampleChunkX = x >> 4;
+                int sampleChunkZ = z >> 4;
+                TerrainSample sample = generationRegion.sample(sampleChunkX, sampleChunkZ);
+                return sample.isBelowSurface(x & 15, y, z & 15, surfaceRules);
+            }
+
+            @Override
             public BlockFaceShape getFaceShape(int x, int y, int z, EnumFacing face) {
                 BlockPos pos = new BlockPos(x, y, z);
                 return getState(x, y, z).getBlockFaceShape(world, pos, face);
@@ -1014,6 +1022,8 @@ public final class ChunkGeneratorExtended extends ChunkGeneratorOverworld {
         private final int chunkX;
         private final int chunkZ;
         private final int[] surfaceHeights = new int[16 * 16];
+        private final int[] surfaceLowerBounds = new int[16 * 16];
+        private final int[] surfaceUpperBounds = new int[16 * 16];
         private WorldGenModernCarvers.CarvingMask carvingMask;
 
         private TerrainSample(FFDModernWorldgenData data, DensityGridCache densityGridCache,
@@ -1024,12 +1034,20 @@ public final class ChunkGeneratorExtended extends ChunkGeneratorOverworld {
             this.chunkX = chunkX;
             this.chunkZ = chunkZ;
             Arrays.fill(surfaceHeights, Integer.MIN_VALUE);
+            Arrays.fill(surfaceLowerBounds, FFDModernWorldgenData.MIN_Y - 1);
+            Arrays.fill(surfaceUpperBounds, FFDModernWorldgenData.MIN_Y
+                    + FFDModernWorldgenData.HEIGHT - 1);
         }
 
         private IBlockState baseStateAt(int localX, int y, int localZ,
                                         int worldX, int worldZ,
                                         FFDModernSurfaceRules surfaceRules) {
-            double density = densitySampler.sample(localX, y, localZ);
+            return baseStateForDensity(worldX, y, worldZ,
+                    densitySampler.sample(localX, y, localZ), surfaceRules);
+        }
+
+        private IBlockState baseStateForDensity(int worldX, int y, int worldZ, double density,
+                                               FFDModernSurfaceRules surfaceRules) {
             IBlockState substance = aquifer.computeSubstance(worldX, y, worldZ, density);
             return substance == null
                     ? surfaceRules.stoneStateAt(worldX, y, worldZ) : substance;
@@ -1066,16 +1084,51 @@ public final class ChunkGeneratorExtended extends ChunkGeneratorOverworld {
             int worldX = (chunkX << 4) + (localX & 15);
             int worldZ = (chunkZ << 4) + (localZ & 15);
             int found = FFDModernWorldgenData.MIN_Y - 1;
+            DensitySampler.Column column = densitySampler.new Column(localX & 15, localZ & 15);
             for (int y = FFDModernWorldgenData.MIN_Y + FFDModernWorldgenData.HEIGHT - 1;
                  y >= FFDModernWorldgenData.MIN_Y; y--) {
-                if (baseStateAt(localX & 15, y, localZ & 15,
-                        worldX, worldZ, surfaceRules).getMaterial().isSolid()) {
+                if (baseStateForDensity(worldX, y, worldZ,
+                        column.sample(y), surfaceRules).getMaterial().isSolid()) {
                     found = y;
                     break;
                 }
             }
             surfaceHeights[index] = found;
             return found;
+        }
+
+        private boolean isBelowSurface(int localX, int y, int localZ,
+                                       FFDModernSurfaceRules surfaceRules) {
+            int index = (localZ & 15) * 16 + (localX & 15);
+            int cached = surfaceHeights[index];
+            if (cached != Integer.MIN_VALUE) {
+                return y <= cached - 2;
+            }
+            int threshold = y + 2;
+            if (threshold <= surfaceLowerBounds[index]) {
+                return true;
+            }
+            if (threshold > surfaceUpperBounds[index]) {
+                return false;
+            }
+            int worldX = (chunkX << 4) + (localX & 15);
+            int worldZ = (chunkZ << 4) + (localZ & 15);
+            DensitySampler.Column column = densitySampler.new Column(localX & 15, localZ & 15);
+            for (int sampleY = threshold; sampleY <= surfaceUpperBounds[index]; sampleY++) {
+                if (baseStateForDensity(worldX, sampleY, worldZ,
+                        column.sample(sampleY), surfaceRules).getMaterial().isSolid()) {
+                    surfaceLowerBounds[index] = sampleY;
+                    if (sampleY == surfaceUpperBounds[index]) {
+                        surfaceHeights[index] = sampleY;
+                    }
+                    return true;
+                }
+            }
+            surfaceUpperBounds[index] = threshold - 1;
+            if (surfaceUpperBounds[index] == surfaceLowerBounds[index]) {
+                surfaceHeights[index] = surfaceLowerBounds[index];
+            }
+            return false;
         }
 
         private void rememberSurfaceHeights(int[] heights) {
@@ -1424,6 +1477,66 @@ public final class ChunkGeneratorExtended extends ChunkGeneratorOverworld {
 
         private static double lerp(double amount, double first, double second) {
             return first + amount * (second - first);
+        }
+
+        private final class Column {
+            private final int cellX;
+            private final int cellZ;
+            private final double fractionX;
+            private final double fractionZ;
+            private final double[] corners = new double[20];
+            private int cellY = Integer.MIN_VALUE;
+            private int sampledFields;
+
+            private Column(int localX, int localZ) {
+                cellX = Math.min(localX / FFDModernWorldgenData.CELL_WIDTH, GRID_X - 2);
+                cellZ = Math.min(localZ / FFDModernWorldgenData.CELL_WIDTH, GRID_Z - 2);
+                fractionX = (localX - cellX * FFDModernWorldgenData.CELL_WIDTH)
+                        / (double) FFDModernWorldgenData.CELL_WIDTH;
+                fractionZ = (localZ - cellZ * FFDModernWorldgenData.CELL_WIDTH)
+                        / (double) FFDModernWorldgenData.CELL_WIDTH;
+            }
+
+            private double sample(int y) {
+                int nextCellY = Math.min(Math.max(Math.floorDiv(
+                        y - FFDModernWorldgenData.MIN_Y, FFDModernWorldgenData.CELL_HEIGHT), 0),
+                        GRID_Y - 2);
+                if (cellY != nextCellY) {
+                    cellY = nextCellY;
+                    sampledFields = 0;
+                }
+                double fractionY = (y - (FFDModernWorldgenData.MIN_Y
+                        + cellY * FFDModernWorldgenData.CELL_HEIGHT))
+                        / (double) FFDModernWorldgenData.CELL_HEIGHT;
+                double mainValue = interpolate(main, 0, fractionY);
+                double toggle = interpolate(noodleToggle, 1, fractionY);
+                if (toggle >= -1000000.0D && toggle < 0.0D) {
+                    return FFDModernWorldgenData.FinalDensityComponents.combine(
+                            mainValue, toggle, 0.0D, 0.0D, 0.0D);
+                }
+                return FFDModernWorldgenData.FinalDensityComponents.combine(mainValue, toggle,
+                        interpolate(noodleThickness, 2, fractionY),
+                        interpolate(noodleRidgeA, 3, fractionY),
+                        interpolate(noodleRidgeB, 4, fractionY));
+            }
+
+            private double interpolate(Grid grid, int field, double fractionY) {
+                int offset = field * 4;
+                int mask = 1 << field;
+                if ((sampledFields & mask) == 0) {
+                    corners[offset] = lerp(fractionX, grid.value(cellX, cellY, cellZ),
+                            grid.value(cellX + 1, cellY, cellZ));
+                    corners[offset + 1] = lerp(fractionX, grid.value(cellX, cellY + 1, cellZ),
+                            grid.value(cellX + 1, cellY + 1, cellZ));
+                    corners[offset + 2] = lerp(fractionX, grid.value(cellX, cellY, cellZ + 1),
+                            grid.value(cellX + 1, cellY, cellZ + 1));
+                    corners[offset + 3] = lerp(fractionX, grid.value(cellX, cellY + 1, cellZ + 1),
+                            grid.value(cellX + 1, cellY + 1, cellZ + 1));
+                    sampledFields |= mask;
+                }
+                return lerp(fractionZ, lerp(fractionY, corners[offset], corners[offset + 1]),
+                        lerp(fractionY, corners[offset + 2], corners[offset + 3]));
+            }
         }
 
         private static final class Grid {

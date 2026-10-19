@@ -22,12 +22,12 @@ public final class AquaAcrobaticsWaterCompat {
 
     public static String stillTexture() {
         return isEnabled() ? "aquaacrobatics:blocks/water_still"
-                : "minecraft:blocks/water_still";
+                : ModernWaterRendering.waterTexture("minecraft:blocks/water_still");
     }
 
     public static String flowingTexture() {
         return isEnabled() ? "aquaacrobatics:blocks/water_flow"
-                : "minecraft:blocks/water_flow";
+                : ModernWaterRendering.waterTexture("minecraft:blocks/water_flow");
     }
 
     public static void registerBiomeColors() {

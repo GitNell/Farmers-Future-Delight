@@ -12,6 +12,9 @@ import xy177.farmersfuturedelight.FarmerFutureDelight;
 public final class FFDSounds {
     private static final List<SoundEvent> ALL = new ArrayList<>();
 
+    public static final SoundEvent GLOW_INK_SAC_USE = sound("item.glow_ink_sac.use");
+    public static final SoundEvent INK_SAC_USE = sound("item.ink_sac.use");
+    public static final SoundEvent DYE_USE = sound("item.dye.use");
     public static final SoundEvent GLOW_SQUID_AMBIENT = sound("entity.glow_squid.ambient");
     public static final SoundEvent GLOW_SQUID_HURT = sound("entity.glow_squid.hurt");
     public static final SoundEvent GLOW_SQUID_DEATH = sound("entity.glow_squid.death");
@@ -157,6 +160,17 @@ public final class FFDSounds {
     public static final SoundEvent DROWNED_SHOOT = sound("entity.drowned.shoot");
     public static final SoundEvent DROWNED_STEP = sound("entity.drowned.step");
     public static final SoundEvent DROWNED_SWIM = sound("entity.drowned.swim");
+    public static final SoundEvent PLAYER_SWIM = sound("entity.player.swim");
+    public static final SoundEvent PLAYER_SPLASH = sound("entity.player.splash");
+    public static final SoundEvent PLAYER_SPLASH_HIGH_SPEED = sound("entity.player.splash.high_speed");
+    public static final SoundEvent UNDERWATER_ENTER = sound("ambient.underwater.enter");
+    public static final SoundEvent UNDERWATER_EXIT = sound("ambient.underwater.exit");
+    public static final SoundEvent UNDERWATER_LOOP = sound("ambient.underwater.loop");
+    public static final SoundEvent UNDERWATER_ADDITIONS = sound("ambient.underwater.loop.additions");
+    public static final SoundEvent UNDERWATER_ADDITIONS_RARE =
+            sound("ambient.underwater.loop.additions.rare");
+    public static final SoundEvent UNDERWATER_ADDITIONS_ULTRA_RARE =
+            sound("ambient.underwater.loop.additions.ultra_rare");
     public static final SoundEvent ZOMBIE_CONVERTED_TO_DROWNED =
             sound("entity.zombie.converted_to_drowned");
     public static final SoundEvent TRIDENT_THROW = sound("item.trident.throw");

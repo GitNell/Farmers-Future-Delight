@@ -96,7 +96,8 @@ public final class FFDRiptide {
             return;
         }
         ItemStack held = ((EntityLivingBase) source).getHeldItemMainhand();
-        if (!FFDItems.isTridentStack(held) || !FFDEnchantments.isAquatic(event.getEntityLiving())) {
+        if (!FFDItems.isTridentStack(held)
+                || !FFDEnchantments.isImpalingDamageTarget(event.getEntityLiving())) {
             return;
         }
         int level = FFDEnchantments.getImpaling(held);

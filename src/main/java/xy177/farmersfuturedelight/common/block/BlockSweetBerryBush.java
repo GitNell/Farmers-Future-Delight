@@ -12,9 +12,11 @@ import net.minecraft.block.state.IBlockState;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.EntityList;
 import net.minecraft.entity.EntityLivingBase;
+import net.minecraft.entity.EntityLiving;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.init.Items;
 import net.minecraft.item.ItemStack;
+import net.minecraft.pathfinding.PathNodeType;
 import net.minecraft.util.DamageSource;
 import net.minecraft.util.BlockRenderLayer;
 import net.minecraft.util.EnumFacing;
@@ -28,6 +30,7 @@ import net.minecraft.util.math.RayTraceResult;
 import net.minecraft.world.IBlockAccess;
 import net.minecraft.world.World;
 import net.minecraft.block.properties.PropertyInteger;
+import net.minecraftforge.common.ForgeHooks;
 import xy177.farmersfuturedelight.common.FFDConfig;
 import xy177.farmersfuturedelight.common.FFDCreativeTab;
 import xy177.farmersfuturedelight.common.entity.EntityBee;
@@ -75,9 +78,12 @@ public class BlockSweetBerryBush extends BlockBush implements net.minecraft.bloc
     public void updateTick(World world, BlockPos pos, IBlockState state, Random rand) {
         int age = state.getValue(AGE);
         if (!world.isRemote && FFDItems.isSweetBerryEnabled() && age < 3
-                && rand.nextInt(FFDConfig.sweetBerryGrowthRoll) == 0
-                && world.getLightFromNeighbors(pos.up()) >= 9) {
-            world.setBlockState(pos, state.withProperty(AGE, age + 1), 2);
+                && world.getLightFromNeighbors(pos.up()) >= 9
+                && ForgeHooks.onCropsGrowPre(world, pos, state,
+                        rand.nextInt(FFDConfig.sweetBerryGrowthRoll) == 0)
+                && world.getBlockState(pos) == state
+                && world.setBlockState(pos, state.withProperty(AGE, age + 1), 2)) {
+            ForgeHooks.onCropsGrowPost(world, pos, state, world.getBlockState(pos));
         }
     }
 
@@ -113,6 +119,13 @@ public class BlockSweetBerryBush extends BlockBush implements net.minecraft.bloc
                         || Math.abs(entity.posZ - entity.prevPosZ) >= (double) 0.003F)) {
             entity.attackEntityFrom(SWEET_BERRY_DAMAGE, 1.0F);
         }
+    }
+
+    @Override
+    public PathNodeType getAiPathNodeType(IBlockState state, IBlockAccess world, BlockPos pos,
+                                         @Nullable EntityLiving entity) {
+        return entity != null && isImmuneToBush(entity)
+                ? PathNodeType.OPEN : PathNodeType.DAMAGE_OTHER;
     }
 
     private static boolean isImmuneToBush(Entity entity) {

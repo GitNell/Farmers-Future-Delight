@@ -234,18 +234,9 @@ public final class FFDItems {
             .setRegistryName(FFDBlocks.HONEY_BLOCK.getRegistryName())
             .setUnlocalizedName(FarmerFutureDelight.MODID + ".honey_block")
             .setCreativeTab(FFDCreativeTab.INSTANCE);
-    public static final Item HONEYCOMB_BLOCK = new ItemBlock(FFDBlocks.HONEYCOMB_BLOCK)
-            .setRegistryName(FFDBlocks.HONEYCOMB_BLOCK.getRegistryName())
-            .setUnlocalizedName(FarmerFutureDelight.MODID + ".honeycomb_block")
-            .setCreativeTab(FFDCreativeTab.INSTANCE);
-    public static final Item BEE_NEST = new ItemBlock(FFDBlocks.BEE_NEST)
-            .setRegistryName(FFDBlocks.BEE_NEST.getRegistryName())
-            .setUnlocalizedName(FarmerFutureDelight.MODID + ".bee_nest")
-            .setCreativeTab(FFDCreativeTab.INSTANCE);
-    public static final Item BEEHIVE = new ItemBlock(FFDBlocks.BEEHIVE)
-            .setRegistryName(FFDBlocks.BEEHIVE.getRegistryName())
-            .setUnlocalizedName(FarmerFutureDelight.MODID + ".beehive")
-            .setCreativeTab(FFDCreativeTab.INSTANCE);
+    public static final Item HONEYCOMB_BLOCK = blockItem(FFDBlocks.HONEYCOMB_BLOCK);
+    public static final Item BEE_NEST = blockItem(FFDBlocks.BEE_NEST);
+    public static final Item BEEHIVE = blockItem(FFDBlocks.BEEHIVE);
     public static final Item KELP = new ItemKelp(FFDBlocks.KELP)
             .setRegistryName(FarmerFutureDelight.MODID, "kelp")
             .setUnlocalizedName(FarmerFutureDelight.MODID + ".kelp")
@@ -275,6 +266,7 @@ public final class FFDItems {
     public static final Item[] DEAD_CORAL_FAN_ITEMS = coralFanItems(
             FFDBlocks.DEAD_CORAL_FANS, FFDBlocks.DEAD_CORAL_WALL_FANS);
     public static final Item BLUE_ICE = blockItem(FFDBlocks.BLUE_ICE);
+    public static final Item[] WOOD_ITEMS = blockItems(FFDBlocks.WOODS);
     public static final Item[] STRIPPED_LOG_ITEMS = blockItems(FFDBlocks.STRIPPED_LOGS);
     public static final Item[] STRIPPED_WOOD_ITEMS = blockItems(FFDBlocks.STRIPPED_WOODS);
     public static final Item[] OVERWORLD_TRAPDOOR_ITEMS =
@@ -807,7 +799,8 @@ public final class FFDItems {
         if (block == FFDBlocks.BUBBLE_COLUMN) {
             return binding(FFDConfig.bubbleColumnMode, FFDCompat.Feature.AQUATIC_DECOR);
         }
-        if (arrayContains(block, FFDBlocks.STRIPPED_LOGS)
+        if (arrayContains(block, FFDBlocks.WOODS)
+                || arrayContains(block, FFDBlocks.STRIPPED_LOGS)
                 || arrayContains(block, FFDBlocks.STRIPPED_WOODS)
                 || arrayContains(block, FFDBlocks.OVERWORLD_TRAPDOORS)
                 || arrayContains(block, FFDBlocks.OVERWORLD_TRAPDOORS_WATERLOGGED)
@@ -1088,6 +1081,16 @@ public final class FFDItems {
         ItemBlock item = new ItemBlock(block) {
             @Override
             public int getItemBurnTime(ItemStack stack) {
+                if (arrayContains(block, FFDBlocks.OVERWORLD_BUTTONS)) {
+                    return 100;
+                }
+                if (arrayContains(block, FFDBlocks.WOODS)
+                        || arrayContains(block, FFDBlocks.STRIPPED_LOGS)
+                        || arrayContains(block, FFDBlocks.STRIPPED_WOODS)
+                        || arrayContains(block, FFDBlocks.OVERWORLD_TRAPDOORS)
+                        || arrayContains(block, FFDBlocks.OVERWORLD_PRESSURE_PLATES)) {
+                    return 300;
+                }
                 return 0;
             }
         };

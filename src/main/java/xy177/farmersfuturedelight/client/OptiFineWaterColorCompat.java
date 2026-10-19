@@ -45,6 +45,8 @@ final class OptiFineWaterColorCompat {
                     "net.optifine.CustomColors$IColorizer", false, loader);
             Field waterColorizerField = customColors.getDeclaredField("COLORIZER_WATER");
             waterColorizerField.setAccessible(true);
+            Field waterColors = customColors.getDeclaredField("waterColors");
+            waterColors.setAccessible(true);
             Object waterColorizer = waterColorizerField.get(null);
             Field smoothBiomes = findSmoothBiomesField();
             Method isColorConstant = colorizerType.getMethod("isColorConstant");
@@ -53,7 +55,7 @@ final class OptiFineWaterColorCompat {
             isColorConstant.setAccessible(true);
             getColor.setAccessible(true);
             LOGGER.info("Using OptiFine final water colormap for waterlogged blocks");
-            return new Accessor(waterColorizer, smoothBiomes, isColorConstant, getColor);
+            return new Accessor(waterColorizer, waterColors, smoothBiomes, isColorConstant, getColor);
         } catch (ClassNotFoundException exception) {
             return UNAVAILABLE;
         } catch (ReflectiveOperationException | LinkageError exception) {
@@ -75,6 +77,7 @@ final class OptiFineWaterColorCompat {
 
     private static final class Accessor {
         private final Object waterColorizer;
+        private final Field waterColors;
         private final Field smoothBiomes;
         private final Method isColorConstant;
         private final Method getColor;
@@ -82,14 +85,16 @@ final class OptiFineWaterColorCompat {
 
         private Accessor() {
             waterColorizer = null;
+            waterColors = null;
             smoothBiomes = null;
             isColorConstant = null;
             getColor = null;
         }
 
-        private Accessor(Object waterColorizer, Field smoothBiomes,
+        private Accessor(Object waterColorizer, Field waterColors, Field smoothBiomes,
                          Method isColorConstant, Method getColor) {
             this.waterColorizer = waterColorizer;
+            this.waterColors = waterColors;
             this.smoothBiomes = smoothBiomes;
             this.isColorConstant = isColorConstant;
             this.getColor = getColor;
@@ -100,6 +105,9 @@ final class OptiFineWaterColorCompat {
                 return fallback;
             }
             try {
+                if (waterColors.get(null) == null) {
+                    return fallback;
+                }
                 boolean smooth = smoothBiomes == null
                         || smoothBiomes.getBoolean(Minecraft.getMinecraft().gameSettings);
                 boolean constant = (Boolean) isColorConstant.invoke(waterColorizer);

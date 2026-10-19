@@ -3,6 +3,7 @@ package xy177.farmersfuturedelight.common.block;
 import javax.annotation.Nullable;
 
 import net.minecraft.block.BlockTrapDoor;
+import net.minecraft.block.SoundType;
 import net.minecraft.block.material.Material;
 import net.minecraft.block.state.BlockStateContainer;
 import net.minecraft.block.state.IBlockState;
@@ -43,6 +44,7 @@ public class BlockOverworldTrapDoor extends BlockTrapDoor implements IWaterlogga
         }
         setHardness(3.0F);
         setResistance(3.0F);
+        setSoundType(SoundType.WOOD);
     }
 
     @Override
@@ -86,7 +88,8 @@ public class BlockOverworldTrapDoor extends BlockTrapDoor implements IWaterlogga
 
     @Override
     public IBlockState setWaterloggedState(IBlockState state, boolean waterlogged) {
-        BlockOverworldTrapDoor target = waterlogged
+        net.minecraft.block.Block target = woodIndex == 0 && !waterlogged
+                ? net.minecraft.init.Blocks.TRAPDOOR : waterlogged
                 ? FFDBlocks.OVERWORLD_TRAPDOORS_WATERLOGGED[woodIndex]
                 : FFDBlocks.OVERWORLD_TRAPDOORS[woodIndex];
         return target.getDefaultState()
@@ -117,7 +120,8 @@ public class BlockOverworldTrapDoor extends BlockTrapDoor implements IWaterlogga
 
     @Override
     public Item getItemDropped(IBlockState state, java.util.Random random, int fortune) {
-        return Item.getItemFromBlock(FFDBlocks.OVERWORLD_TRAPDOORS[woodIndex]);
+        return Item.getItemFromBlock(woodIndex == 0 ? net.minecraft.init.Blocks.TRAPDOOR
+                : FFDBlocks.OVERWORLD_TRAPDOORS[woodIndex]);
     }
 
     @Override

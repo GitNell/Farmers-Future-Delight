@@ -66,6 +66,7 @@ public final class FFDPowderSnowEvents {
     private static volatile Map<ResourceLocation, Float> ADDITIONAL_DAMAGE =
             Collections.emptyMap();
     private static volatile Set<ResourceLocation> WALKABLE_BOOTS = Collections.emptySet();
+    private static volatile Set<ResourceLocation> WALKABLE_MOBS = Collections.emptySet();
     private static volatile Set<ResourceLocation> FREEZING_ARMOR = Collections.emptySet();
 
     private FFDPowderSnowEvents() {
@@ -131,6 +132,16 @@ public final class FFDPowderSnowEvents {
             }
         }
 
+        Set<ResourceLocation> walkableMobs = new HashSet<>();
+        if (FFDConfig.powderSnowWalkableMobs != null) {
+            for (String entry : FFDConfig.powderSnowWalkableMobs) {
+                ResourceLocation id = parseId(entry);
+                if (id != null) {
+                    walkableMobs.add(id);
+                }
+            }
+        }
+
         Set<ResourceLocation> freezingArmor = new HashSet<>();
         if (FFDConfig.powderSnowFreezingArmor != null) {
             for (String entry : FFDConfig.powderSnowFreezingArmor) {
@@ -145,6 +156,7 @@ public final class FFDPowderSnowEvents {
         IMMUNITIES = Collections.unmodifiableSet(immunities);
         ADDITIONAL_DAMAGE = Collections.unmodifiableMap(additionalDamage);
         WALKABLE_BOOTS = Collections.unmodifiableSet(walkableBoots);
+        WALKABLE_MOBS = Collections.unmodifiableSet(walkableMobs);
         FREEZING_ARMOR = Collections.unmodifiableSet(freezingArmor);
     }
 
@@ -171,6 +183,11 @@ public final class FFDPowderSnowEvents {
             return false;
         }
         return WALKABLE_BOOTS.contains(stack.getItem().getRegistryName());
+    }
+
+    public static boolean isWalkableMob(Entity entity) {
+        ResourceLocation id = EntityList.getKey(entity);
+        return id != null && WALKABLE_MOBS.contains(id);
     }
 
     @SubscribeEvent

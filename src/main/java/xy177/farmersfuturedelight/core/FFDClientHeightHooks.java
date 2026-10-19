@@ -32,6 +32,7 @@ import net.minecraftforge.client.MinecraftForgeClient;
 import net.minecraftforge.common.property.IExtendedBlockState;
 import net.minecraftforge.fluids.Fluid;
 import net.minecraftforge.fluids.FluidRegistry;
+import net.minecraftforge.fml.common.Loader;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import xy177.farmersfuturedelight.client.AquaAcrobaticsWaterCompat;
@@ -46,6 +47,7 @@ public final class FFDClientHeightHooks {
     private static final Logger LOGGER = LogManager.getLogger("FFD Height Core");
     private static final Object SHADER_ALIAS_LOCK = new Object();
     private static LoadingScreenRenderer previousIntegratedWorldLoadingScreen;
+    private static FFDLoadingScreenRenderer integratedWorldLoadingScreen;
     private static float previousTerrainFov = Float.NaN;
     private static volatile Object shaderAliasPack;
     private static volatile boolean shaderAliasesResolved;
@@ -97,6 +99,8 @@ public final class FFDClientHeightHooks {
     public static IBlockState extendedWaterloggedRenderState(IBlockState state,
             net.minecraft.world.IBlockAccess world, BlockPos pos) {
         return MinecraftForgeClient.getRenderLayer() == BlockRenderLayer.TRANSLUCENT
+                && !(Loader.isModLoaded("fluidlogged_api")
+                    && WaterloggedBlockApi.getFluidForBlock(state.getBlock()) != null)
                 ? WaterloggedBlockApi.getExtendedState(state, world, pos) : state;
     }
 
@@ -104,13 +108,30 @@ public final class FFDClientHeightHooks {
             net.minecraft.world.IBlockAccess world, BlockPos pos) {
         return MinecraftForgeClient.getRenderLayer() == BlockRenderLayer.TRANSLUCENT
                 && (state.getRenderType() != EnumBlockRenderType.MODEL
-                    || xy177.farmersfuturedelight.common.fluid.FFDStoredFluidStates.has(world, pos))
+                    || xy177.farmersfuturedelight.common.fluid.FFDStoredFluidStates.has(world, pos)
+                    || Loader.isModLoaded("fluidlogged_api"))
+                && WaterloggedBlockApi.getFluidForBlock(state.getBlock()) == null
                 && WaterloggedBlockApi.isWaterlogged(world, pos);
     }
 
     public static boolean renderWaterloggedSpecial(BlockRendererDispatcher renderer,
             IBlockState state, BlockPos pos, net.minecraft.world.IBlockAccess world,
             BufferBuilder buffer) {
+        if (Loader.isModLoaded("fluidlogged_api")) {
+            boolean rendered = false;
+            if (state.getRenderType() == EnumBlockRenderType.MODEL
+                    && state.getBlock().getBlockLayer() == BlockRenderLayer.TRANSLUCENT) {
+                IBlockState actual = state.getActualState(world, pos);
+                net.minecraft.client.renderer.block.model.IBakedModel model = renderer.getModelForState(actual);
+                if (model instanceof WaterloggedPlantBakedModel) {
+                    model = ((WaterloggedPlantBakedModel) model).getPlantModel();
+                }
+                rendered = renderer.getBlockModelRenderer().renderModel(world, model,
+                        actual.getBlock().getExtendedState(actual, world, pos), pos, buffer, true);
+            }
+            IBlockState fluid = WaterloggedBlockApi.getFluidState(world, pos);
+            return renderer.renderBlock(fluid, pos, world, buffer) || rendered;
+        }
         IBlockState extended = WaterloggedBlockApi.getExtendedState(state, world, pos);
         net.minecraft.client.renderer.block.model.IBakedModel model = renderer.getModelForState(state);
         return renderer.getBlockModelRenderer().renderModel(world,
@@ -184,7 +205,7 @@ public final class FFDClientHeightHooks {
 
     public static float fluidBottomColorComponent(float original, int color, int shift,
             IBlockState state) {
-        if (!ModernWaterRendering.isModernEnabled() || AquaAcrobaticsWaterCompat.isEnabled()
+        if (!ModernWaterRendering.usesModernWaterTextures() || AquaAcrobaticsWaterCompat.isEnabled()
                 || state == null || state.getMaterial() != Material.WATER) {
             return original;
         }
@@ -291,15 +312,52 @@ public final class FFDClientHeightHooks {
             return;
         }
         previousIntegratedWorldLoadingScreen = minecraft.loadingScreen;
-        minecraft.loadingScreen = new FFDLoadingScreenRenderer(minecraft);
+        integratedWorldLoadingScreen = new FFDLoadingScreenRenderer(minecraft);
+        FFDLoadingScreenRenderer.beginWorldLoad();
+        minecraft.loadingScreen = integratedWorldLoadingScreen;
     }
 
     public static void endIntegratedWorldLoad(Minecraft minecraft) {
-        if (minecraft.loadingScreen instanceof FFDLoadingScreenRenderer) {
+        try {
+            if (integratedWorldLoadingScreen != null
+                    && minecraft.loadingScreen == integratedWorldLoadingScreen) {
+                integratedWorldLoadingScreen.finish();
+            }
+        } finally {
+            cancelIntegratedWorldLoad(minecraft);
+        }
+    }
+
+    public static void cancelIntegratedWorldLoad(Minecraft minecraft) {
+        if (integratedWorldLoadingScreen == null) {
+            return;
+        }
+        FFDLoadingScreenRenderer renderer = integratedWorldLoadingScreen;
+        if (minecraft.loadingScreen == integratedWorldLoadingScreen) {
             minecraft.loadingScreen = previousIntegratedWorldLoadingScreen == null
                     ? new LoadingScreenRenderer(minecraft) : previousIntegratedWorldLoadingScreen;
         }
+        integratedWorldLoadingScreen = null;
         previousIntegratedWorldLoadingScreen = null;
+        FFDLoadingScreenRenderer.endWorldLoad();
+        renderer.close();
+    }
+
+    public static long waitIntegratedWorldLoad(long millis) throws InterruptedException {
+        if (integratedWorldLoadingScreen == null) {
+            return millis;
+        }
+        integratedWorldLoadingScreen.renderWhileWaiting(millis);
+        return 0L;
+    }
+
+    public static void resizeIntegratedWorldLoad(Minecraft minecraft) {
+        if (integratedWorldLoadingScreen != null
+                && minecraft.loadingScreen != null
+                && minecraft.loadingScreen.getClass() == LoadingScreenRenderer.class) {
+            previousIntegratedWorldLoadingScreen = minecraft.loadingScreen;
+            minecraft.loadingScreen = integratedWorldLoadingScreen;
+        }
     }
 
     public static RenderChunk getRenderChunkOffset(World world, ViewFrustum viewFrustum,

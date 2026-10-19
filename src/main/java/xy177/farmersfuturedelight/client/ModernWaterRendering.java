@@ -1,12 +1,19 @@
 package xy177.farmersfuturedelight.client;
 
 import java.io.File;
+import java.io.IOException;
 import java.util.List;
+import java.util.Map;
 
+import net.minecraft.block.Block;
 import net.minecraft.block.material.Material;
+import net.minecraft.block.state.IBlockState;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.GlStateManager;
+import net.minecraft.client.renderer.color.BlockColors;
+import net.minecraft.client.renderer.color.IBlockColor;
 import net.minecraft.client.resources.IResourcePack;
+import net.minecraft.client.resources.IResource;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.EntityLivingBase;
 import net.minecraft.entity.player.EntityPlayer;
@@ -22,9 +29,9 @@ import net.minecraft.world.biome.Biome;
 import net.minecraft.world.biome.BiomeColorHelper;
 import net.minecraftforge.client.event.ColorHandlerEvent;
 import net.minecraftforge.client.event.EntityViewRenderEvent;
+import net.minecraftforge.client.event.TextureStitchEvent;
 import net.minecraftforge.client.resource.VanillaResourceType;
 import net.minecraftforge.common.BiomeDictionary;
-import net.minecraftforge.event.terraingen.BiomeEvent;
 import net.minecraftforge.fml.client.FMLClientHandler;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.common.ObfuscationReflectionHelper;
@@ -32,6 +39,7 @@ import net.minecraftforge.fml.common.eventhandler.EventPriority;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import net.minecraftforge.fml.common.gameevent.TickEvent;
 import net.minecraftforge.fml.relauncher.Side;
+import net.minecraftforge.registries.IRegistryDelegate;
 import xy177.farmersfuturedelight.FarmerFutureDelight;
 import xy177.farmersfuturedelight.common.FFDConfig;
 import xy177.farmersfuturedelight.common.biome.ModernWaterBiome;
@@ -53,12 +61,60 @@ public final class ModernWaterRendering {
     private static int targetFogColor = -1;
     private static int previousFogColor = -1;
     private static long fogAdjustTime = -1L;
+    private static IBlockColor externalWaterColor;
+    private static volatile boolean modernWaterTextures;
 
     private ModernWaterRendering() {
     }
 
     public static boolean isModernEnabled() {
         return FFDConfig.waterVisualMode == FFDConfig.WaterVisualMode.MODERN;
+    }
+
+    public static boolean usesModernWaterTextures() {
+        return modernWaterTextures;
+    }
+
+    @SubscribeEvent(priority = EventPriority.LOWEST)
+    public static void stitchWaterTextures(TextureStitchEvent.Pre event) {
+        if (event.getMap() != Minecraft.getMinecraft().getTextureMapBlocks()) {
+            return;
+        }
+        modernWaterTextures = isModernEnabled() && !AquaAcrobaticsWaterCompat.isEnabled()
+                && isDefaultWaterResource("water_still") && isDefaultWaterResource("water_flow");
+        if (modernWaterTextures) {
+            event.getMap().registerSprite(new ResourceLocation(FarmerFutureDelight.MODID,
+                    "blocks/modern_water_still"));
+            event.getMap().registerSprite(new ResourceLocation(FarmerFutureDelight.MODID,
+                    "blocks/modern_water_flow"));
+        }
+    }
+
+    private static boolean isDefaultWaterResource(String name) {
+        try (IResource resource = Minecraft.getMinecraft().getResourceManager().getResource(
+                new ResourceLocation("minecraft", "textures/blocks/" + name + ".png"))) {
+            return "Default".equals(resource.getResourcePackName());
+        } catch (IOException exception) {
+            return false;
+        }
+    }
+
+    public static String waterTexture(String original) {
+        if (modernWaterTextures) {
+            if ("minecraft:blocks/water_still".equals(original)) {
+                return FarmerFutureDelight.MODID + ":blocks/modern_water_still";
+            }
+            if ("minecraft:blocks/water_flow".equals(original)) {
+                return FarmerFutureDelight.MODID + ":blocks/modern_water_flow";
+            }
+        }
+        return original;
+    }
+
+    public static int renderedWaterColor(int original, IBlockAccess world, IBlockState state,
+            BlockPos pos) {
+        return modernWaterTextures && state.getMaterial() == Material.WATER
+                ? getWaterColor(world, pos) : original;
     }
 
     public static void installResourcePack(File source) {
@@ -78,20 +134,39 @@ public final class ModernWaterRendering {
     }
 
     public static void registerWaterBlockColors(ColorHandlerEvent.Block event) {
-        if (!isModernEnabled() || AquaAcrobaticsWaterCompat.isEnabled()) {
+        if (AquaAcrobaticsWaterCompat.isEnabled()) {
             return;
         }
-        event.getBlockColors().registerBlockColorHandler(
-                (state, world, pos, tintIndex) -> world == null || pos == null
-                        ? MODERN_DEFAULT_WATER_COLOR : getWaterColor(world, pos),
-                Blocks.WATER, Blocks.FLOWING_WATER);
+        BlockColors blockColors = event.getBlockColors();
+        Map<IRegistryDelegate<Block>, IBlockColor> handlers =
+                ObfuscationReflectionHelper.getPrivateValue(BlockColors.class, blockColors,
+                        "blockColorMap", "field_186725_a");
+        for (Block block : new Block[]{Blocks.WATER, Blocks.FLOWING_WATER}) {
+            IBlockColor original = handlers.get(block.delegate);
+            boolean customHandler = original != null && !original.getClass().getName()
+                    .startsWith("net.minecraft.client.renderer.color.BlockColors$");
+            if (customHandler && externalWaterColor == null) {
+                externalWaterColor = original;
+            }
+        }
     }
 
     public static int getWaterColor(IBlockAccess world, BlockPos pos) {
-        if (!isModernEnabled()) {
+        if (externalWaterColor != null) {
+            int color = externalWaterColor.colorMultiplier(
+                    Blocks.WATER.getDefaultState(), world, pos, 0);
+            if (color != -1) {
+                return color & 0xFFFFFF;
+            }
+        }
+        if (!modernWaterTextures) {
             return OptiFineWaterColorCompat.getColor(world, pos,
                     BiomeColorHelper.getWaterColorAtPos(world, pos));
         }
+        return OptiFineWaterColorCompat.getColor(world, pos, getBiomeWaterColor(world, pos));
+    }
+
+    private static int getBiomeWaterColor(IBlockAccess world, BlockPos pos) {
         int red = 0;
         int green = 0;
         int blue = 0;
@@ -99,7 +174,8 @@ public final class ModernWaterRendering {
         for (int x = -WATER_BLEND_RADIUS; x <= WATER_BLEND_RADIUS; x++) {
             for (int z = -WATER_BLEND_RADIUS; z <= WATER_BLEND_RADIUS; z++) {
                 sample.setPos(pos.getX() + x, pos.getY(), pos.getZ() + z);
-                int color = world.getBiome(sample).getWaterColor();
+                Biome biome = world.getBiome(sample);
+                int color = modernWaterColor(biome, biome.getWaterColor());
                 red += color >> 16 & 255;
                 green += color >> 8 & 255;
                 blue += color & 255;
@@ -107,15 +183,7 @@ public final class ModernWaterRendering {
         }
         int samples = (WATER_BLEND_RADIUS * 2 + 1) * (WATER_BLEND_RADIUS * 2 + 1);
         int biomeColor = red / samples << 16 | green / samples << 8 | blue / samples;
-        return OptiFineWaterColorCompat.getColor(world, pos, biomeColor);
-    }
-
-    @SubscribeEvent(priority = EventPriority.LOWEST)
-    public static void replaceBiomeWaterColor(BiomeEvent.GetWaterColor event) {
-        if (!isModernEnabled() || AquaAcrobaticsWaterCompat.isEnabled()) {
-            return;
-        }
-        event.setNewColor(modernWaterColor(event.getBiome(), event.getNewColor()));
+        return biomeColor;
     }
 
     @SubscribeEvent

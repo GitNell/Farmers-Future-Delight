@@ -337,6 +337,7 @@ public final class FFDBlocks {
     public static final BlockBlueIce BLUE_ICE = new BlockBlueIce();
     public static final BlockConduit CONDUIT = new BlockConduit();
     public static final BlockBubbleColumn BUBBLE_COLUMN = new BlockBubbleColumn();
+    public static final BlockStrippedLog[] WOODS = overworldWoods();
     public static final BlockStrippedLog[] STRIPPED_LOGS = strippedLogs(false);
     public static final BlockStrippedLog[] STRIPPED_WOODS = strippedLogs(true);
     public static final BlockOverworldTrapDoor[] OVERWORLD_TRAPDOORS = overworldTrapdoors(false);
@@ -495,6 +496,15 @@ public final class FFDBlocks {
                                                       CopperWeathering.WeatherState age,
                                                       boolean waxed) {
         return new BlockWeatheringCopper(name, age, waxed);
+    }
+
+    private static BlockStrippedLog[] overworldWoods() {
+        BlockStrippedLog[] blocks = new BlockStrippedLog[OVERWORLD_WOOD_NAMES.length];
+        for (int i = 0; i < blocks.length; i++) {
+            blocks[i] = new BlockStrippedLog(OVERWORLD_WOOD_NAMES[i] + "_wood",
+                    i == 4 ? MapColor.GRAY : STRIPPED_WOOD_MAP_COLORS[i]);
+        }
+        return blocks;
     }
 
     private static BlockStrippedLog[] strippedLogs(boolean wood) {

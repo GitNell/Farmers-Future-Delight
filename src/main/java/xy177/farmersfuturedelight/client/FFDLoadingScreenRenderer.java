@@ -8,6 +8,7 @@ import net.minecraft.client.renderer.OpenGlHelper;
 import net.minecraft.client.shader.Framebuffer;
 import net.minecraft.server.integrated.IntegratedServer;
 import net.minecraft.util.math.MathHelper;
+import net.minecraftforge.fml.common.ObfuscationReflectionHelper;
 
 public final class FFDLoadingScreenRenderer extends LoadingScreenRenderer {
     private final Minecraft minecraft;
@@ -15,12 +16,40 @@ public final class FFDLoadingScreenRenderer extends LoadingScreenRenderer {
     private final FFDLoadingPanoramaRenderer panoramaRenderer =
             new FFDLoadingPanoramaRenderer();
     private long lastDrawTime;
+    private int lastProgress;
 
     public FFDLoadingScreenRenderer(Minecraft minecraft) {
         super(minecraft);
         this.minecraft = minecraft;
-        this.framebuffer = new Framebuffer(minecraft.displayWidth, minecraft.displayHeight, false);
+        this.framebuffer = ObfuscationReflectionHelper.getPrivateValue(
+                LoadingScreenRenderer.class, this, "field_146588_g");
         this.framebuffer.setFramebufferFilter(9728);
+    }
+
+    public static void beginWorldLoad() {
+        FFDLoadingProgress.begin();
+    }
+
+    public static void endWorldLoad() {
+        FFDLoadingProgress.end();
+    }
+
+    public void close() {
+        panoramaRenderer.close();
+        framebuffer.deleteFramebuffer();
+    }
+
+    public void finish() {
+        lastDrawTime = 0L;
+        setLoadingProgress(-1);
+    }
+
+    public void renderWhileWaiting(long millis) throws InterruptedException {
+        long until = Minecraft.getSystemTime() + millis;
+        while (Minecraft.getSystemTime() < until) {
+            setLoadingProgress(-1);
+            Thread.sleep(Math.min(16L, Math.max(1L, until - Minecraft.getSystemTime())));
+        }
     }
 
     @Override
@@ -42,7 +71,7 @@ public final class FFDLoadingScreenRenderer extends LoadingScreenRenderer {
     @Override
     public void setLoadingProgress(int suppliedProgress) {
         long now = Minecraft.getSystemTime();
-        if (now - lastDrawTime < 100L) {
+        if (now - lastDrawTime < 16L) {
             return;
         }
         lastDrawTime = now;
@@ -52,7 +81,11 @@ public final class FFDLoadingScreenRenderer extends LoadingScreenRenderer {
         if (server != null && server.currentTask != null) {
             progress = server.percentDone;
         }
-        render(progress);
+        if (server != null && server.serverIsInRunLoop()) {
+            progress = 100;
+        }
+        lastProgress = Math.max(lastProgress, MathHelper.clamp(progress, 0, 100));
+        render(lastProgress);
     }
 
     private void render(int progress) {
@@ -82,21 +115,29 @@ public final class FFDLoadingScreenRenderer extends LoadingScreenRenderer {
             GlStateManager.clear(16640);
         }
 
-        panoramaRenderer.render(minecraft, width, height, framebuffer);
+        boolean forgeHandled;
+        try {
+            forgeHandled = net.minecraftforge.fml.client.FMLClientHandler.instance()
+                    .handleLoadingScreen(resolution);
+        } catch (java.io.IOException failure) {
+            throw new RuntimeException(failure);
+        }
+        if (!forgeHandled) {
+            panoramaRenderer.render(minecraft, width, height, framebuffer);
 
-        int centerX = width / 2;
-        int gridCenterY = height / 2;
-        GlStateManager.disableTexture2D();
-        FFDLoadingProgress.drawServerProgressGrid(centerX, gridCenterY,
-                Math.max(0, progress));
-        GlStateManager.enableTexture2D();
+            int centerX = width / 2;
+            int centerY = height / 2;
+            GlStateManager.disableTexture2D();
+            FFDLoadingProgress.draw(centerX, centerY, progress);
+            GlStateManager.enableTexture2D();
 
-        String percent = MathHelper.clamp(progress, 0, 100) + "%";
-        int percentY = gridCenterY - FFDLoadingProgress.GRID_DIAMETER
-                - minecraft.fontRenderer.FONT_HEIGHT - 2;
-        minecraft.fontRenderer.drawStringWithShadow(percent,
-                (width - minecraft.fontRenderer.getStringWidth(percent)) / 2.0F,
-                percentY, 0xFFFFFF);
+            String percent = MathHelper.clamp(progress, 0, 100) + "%";
+            int percentY = centerY - FFDLoadingProgress.textOffset(
+                    minecraft.fontRenderer.FONT_HEIGHT);
+            minecraft.fontRenderer.drawStringWithShadow(percent,
+                    (width - minecraft.fontRenderer.getStringWidth(percent)) / 2.0F,
+                    percentY, 0xFFFFFF);
+        }
 
         framebuffer.unbindFramebuffer();
         if (OpenGlHelper.isFramebufferEnabled()) {

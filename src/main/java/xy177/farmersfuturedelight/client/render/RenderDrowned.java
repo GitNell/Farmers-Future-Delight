@@ -61,7 +61,9 @@ public class RenderDrowned extends RenderBiped<EntityDrowned> {
         super.applyRotations(drowned, ageInTicks, rotationYaw, partialTicks);
         float swimAmount = drowned.getSwimAmount(partialTicks);
         if (swimAmount > 0.0F) {
-            GlStateManager.rotate(swimAmount * (-10.0F - drowned.rotationPitch),
+            float pitch = drowned.prevRotationPitch
+                    + (drowned.rotationPitch - drowned.prevRotationPitch) * partialTicks;
+            GlStateManager.rotate(swimAmount * (-10.0F - pitch),
                     1.0F, 0.0F, 0.0F);
         }
     }

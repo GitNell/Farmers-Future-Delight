@@ -33,6 +33,13 @@ public class RenderPhantom extends RenderLiving<EntityPhantom> {
     }
 
     @Override
+    protected void applyRotations(EntityPhantom phantom, float ageInTicks,
+                                  float rotationYaw, float partialTicks) {
+        super.applyRotations(phantom, ageInTicks, rotationYaw, partialTicks);
+        GlStateManager.rotate(phantom.getRenderPitch(partialTicks), 1.0F, 0.0F, 0.0F);
+    }
+
+    @Override
     protected void preRenderCallback(EntityPhantom phantom, float partialTickTime) {
         float scale = 1.0F + 0.15F * phantom.getPhantomSize();
         GlStateManager.scale(scale, scale, scale);

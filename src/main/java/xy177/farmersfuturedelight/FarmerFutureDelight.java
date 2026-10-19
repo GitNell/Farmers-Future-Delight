@@ -33,6 +33,7 @@ import xy177.farmersfuturedelight.common.world.biome.FFDVerticalBiomeManager;
 import xy177.farmersfuturedelight.common.fluid.FFDFluidloggedData;
 import xy177.farmersfuturedelight.common.worldgen.FFDOceanStructures;
 import xy177.farmersfuturedelight.common.command.CommandLocateBiome;
+import xy177.farmersfuturedelight.common.command.CommandCompatibility;
 import xy177.farmersfuturedelight.common.command.CommandRawOre;
 import xy177.farmersfuturedelight.common.command.CommandStrippedWood;
 import xy177.farmersfuturedelight.core.FFDCoreCompat;
@@ -44,7 +45,7 @@ import xy177.farmersfuturedelight.proxy.CommonProxy;
 public class FarmerFutureDelight {
     public static final String MODID = "farmers_future_delight";
     public static final String NAME = "Farmer's Future Delight";
-    public static final String VERSION = "1.4.0";
+    public static final String VERSION = "1.4.6";
 
     @Mod.Instance(MODID)
     public static FarmerFutureDelight instance;
@@ -105,6 +106,7 @@ public class FarmerFutureDelight {
     @Mod.EventHandler
     public void serverStarting(FMLServerStartingEvent event) {
         event.registerServerCommand(new CommandLocateBiome());
+        event.registerServerCommand(new CommandCompatibility());
         event.registerServerCommand(new CommandRawOre());
         event.registerServerCommand(new CommandStrippedWood());
         event.registerServerCommand(new xy177.farmersfuturedelight.common.command.CommandFluidMigration());

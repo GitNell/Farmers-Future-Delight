@@ -121,8 +121,10 @@ public final class ClientEventHandler {
             return;
         }
         Minecraft minecraft = Minecraft.getMinecraft();
-        if (event.getGui() instanceof net.minecraft.client.gui.GuiDownloadTerrain
-                && !(event.getGui() instanceof FFDDownloadTerrainScreen)) {
+        if (event.getGui() != null && (event.getGui().getClass()
+                == net.minecraft.client.gui.GuiDownloadTerrain.class
+                || (event.getGui().getClass() == net.minecraft.client.gui.GuiScreenWorking.class
+                && minecraft.loadingScreen instanceof FFDLoadingScreenRenderer))) {
             event.setGui(new FFDDownloadTerrainScreen());
             return;
         }
@@ -132,7 +134,7 @@ public final class ClientEventHandler {
                     (FFDDownloadTerrainScreen) minecraft.currentScreen;
             if (minecraft.world != null && minecraft.player != null
                     && screen.holdUntilChunksReady()) {
-                event.setGui(screen);
+                event.setCanceled(true);
             }
         }
     }
@@ -176,20 +178,6 @@ public final class ClientEventHandler {
         if (xy177.farmersfuturedelight.common.registry.FFDEntities
                 .isLocalGlowItemFrameEnabled()) {
             event.getMap().registerSprite(id("block/glow_item_frame"));
-        }
-        {
-            for (Fluid fluid : FluidRegistry.getRegisteredFluids().values()) {
-                if (fluid.getBlock() == null) {
-                    continue;
-                }
-                FluidStack stack = new FluidStack(fluid, Fluid.BUCKET_VOLUME);
-                if (fluid.getStill(stack) != null) {
-                    event.getMap().registerSprite(fluid.getStill(stack));
-                }
-                if (fluid.getFlowing(stack) != null) {
-                    event.getMap().registerSprite(fluid.getFlowing(stack));
-                }
-            }
         }
     }
 
@@ -429,6 +417,29 @@ public final class ClientEventHandler {
     }
 
     @SubscribeEvent(priority = EventPriority.HIGHEST)
+    public static void renderUsingGoatHorn(RenderSpecificHandEvent event) {
+        Minecraft minecraft = Minecraft.getMinecraft();
+        if (minecraft.player == null || event.getItemStack().isEmpty()
+                || event.getItemStack().getItem() != FFDItems.GOAT_HORN
+                || !minecraft.player.isHandActive()
+                || minecraft.player.getItemInUseCount() <= 0
+                || minecraft.player.getActiveHand() != event.getHand()) {
+            return;
+        }
+        EnumHandSide side = event.getHand() == EnumHand.MAIN_HAND
+                ? minecraft.player.getPrimaryHand()
+                : minecraft.player.getPrimaryHand().opposite();
+        boolean right = side == EnumHandSide.RIGHT;
+        GlStateManager.pushMatrix();
+        minecraft.getItemRenderer().renderItemSide(minecraft.player, event.getItemStack(),
+                right ? ItemCameraTransforms.TransformType.FIRST_PERSON_RIGHT_HAND
+                        : ItemCameraTransforms.TransformType.FIRST_PERSON_LEFT_HAND,
+                !right);
+        GlStateManager.popMatrix();
+        event.setCanceled(true);
+    }
+
+    @SubscribeEvent(priority = EventPriority.HIGHEST)
     public static void renderChargingTrident(RenderSpecificHandEvent event) {
         Minecraft minecraft = Minecraft.getMinecraft();
         ItemStack stack = event.getItemStack();
@@ -597,7 +608,9 @@ public final class ClientEventHandler {
             return;
         }
         EntityLivingBase entity = event.getEntity();
-        if (FFDPowderSnowEvents.getFrozenPercent(entity) < 1.0F) {
+        if (FFDPowderSnowEvents.getFrozenPercent(entity) < 1.0F
+                && !entity.getEntityData().getBoolean(
+                        xy177.farmersfuturedelight.common.FFDGameplayEvents.DROWNED_CONVERTING_TAG)) {
             return;
         }
         float[] rotation = {entity.prevRenderYawOffset, entity.renderYawOffset};

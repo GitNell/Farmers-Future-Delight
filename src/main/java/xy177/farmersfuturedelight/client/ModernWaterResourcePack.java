@@ -19,10 +19,10 @@ final class ModernWaterResourcePack extends AbstractResourcePack {
     private static final String PACK_METADATA =
             "{\"pack\":{\"pack_format\":3,\"description\":\"Farmer's Future Delight modern water\"}}";
     private static final Set<String> CONTENTS = Collections.unmodifiableSet(new HashSet<>(Arrays.asList(
-            "assets/minecraft/textures/blocks/water_still.png",
-            "assets/minecraft/textures/blocks/water_still.png.mcmeta",
-            "assets/minecraft/textures/blocks/water_flow.png",
-            "assets/minecraft/textures/blocks/water_flow.png.mcmeta",
+            "assets/farmers_future_delight/textures/blocks/modern_water_still.png",
+            "assets/farmers_future_delight/textures/blocks/modern_water_still.png.mcmeta",
+            "assets/farmers_future_delight/textures/blocks/modern_water_flow.png",
+            "assets/farmers_future_delight/textures/blocks/modern_water_flow.png.mcmeta",
             "assets/minecraft/textures/blocks/water_overlay.png",
             "assets/minecraft/textures/misc/underwater.png")));
 
@@ -38,8 +38,11 @@ final class ModernWaterResourcePack extends AbstractResourcePack {
         if (!CONTENTS.contains(name)) {
             throw new FileNotFoundException(name);
         }
+        String privatePrefix = "assets/farmers_future_delight/textures/blocks/modern_";
         String path = "/assets/farmers_future_delight/overrides/"
-                + name.substring("assets/minecraft/".length());
+                + (name.startsWith(privatePrefix) ? "textures/blocks/"
+                        + name.substring(privatePrefix.length())
+                        : name.substring("assets/minecraft/".length()));
         InputStream input = ModernWaterResourcePack.class.getResourceAsStream(path);
         if (input == null) {
             throw new FileNotFoundException(path);
@@ -49,12 +52,14 @@ final class ModernWaterResourcePack extends AbstractResourcePack {
 
     @Override
     protected boolean hasResourceName(String name) {
-        return "pack.mcmeta".equals(name) || CONTENTS.contains(name);
+        return "pack.mcmeta".equals(name) || CONTENTS.contains(name)
+                && (!name.startsWith("assets/minecraft/")
+                        || ModernWaterRendering.usesModernWaterTextures());
     }
 
     @Override
     public Set<String> getResourceDomains() {
-        return Collections.singleton("minecraft");
+        return new HashSet<>(Arrays.asList("minecraft", "farmers_future_delight"));
     }
 
     @Nonnull

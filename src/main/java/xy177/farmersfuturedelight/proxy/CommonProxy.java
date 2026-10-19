@@ -61,6 +61,9 @@ public class CommonProxy {
     public void handleRiptideState(int entityId, int ticks) {
     }
 
+    public void handleDrownedConverting(int dimension, int entityId, boolean converting) {
+    }
+
     public void handleFluidloggedChunk(int dimension, int chunkX, int chunkZ,
                                        Map<Long, String> fluids) {
     }

@@ -102,54 +102,73 @@ public final class FFDClientSwimmingHooks {
         }
         EntityPlayer player = (EntityPlayer) entity;
         applyTridentPose(model, limbSwing, limbSwingAmount, ageInTicks, player);
-        if (!FFDGameplayHooks.isSwimmingSystemEnabled()) {
+        if (FFDGameplayHooks.isSwimmingSystemEnabled()) {
+            float partialTicks = MathHelper.clamp(ageInTicks - player.ticksExisted, 0.0F, 1.0F);
+            float animation = getSwimAnimation(player, partialTicks);
+            if (animation > 0.0F) {
+                model.bipedHead.rotateAngleX = rotLerp(animation, model.bipedHead.rotateAngleX,
+                        -(float) Math.PI / 4.0F);
+                float cycle = limbSwing % 26.0F;
+                if (cycle < 0.0F) {
+                    cycle += 26.0F;
+                }
+                EnumHandSide activeSide = activeSwingingSide(player);
+                float rightAnimation = activeSide == EnumHandSide.RIGHT && model.swingProgress > 0.0F
+                        ? 0.0F : animation;
+                float leftAnimation = activeSide == EnumHandSide.LEFT && model.swingProgress > 0.0F
+                        ? 0.0F : animation;
+
+                if (cycle < 14.0F) {
+                    applyArm(model.bipedLeftArm, leftAnimation, 0.0F, (float) Math.PI,
+                            (float) Math.PI + 1.8707964F * armAngle(cycle) / armAngle(14.0F));
+                    applyArm(model.bipedRightArm, rightAnimation, 0.0F, (float) Math.PI,
+                            (float) Math.PI - 1.8707964F * armAngle(cycle) / armAngle(14.0F));
+                } else if (cycle < 22.0F) {
+                    float progress = (cycle - 14.0F) / 8.0F;
+                    applyArm(model.bipedLeftArm, leftAnimation, (float) Math.PI / 2.0F * progress,
+                            (float) Math.PI, 5.012389F - 1.8707964F * progress);
+                    applyArm(model.bipedRightArm, rightAnimation,
+                            (float) Math.PI / 2.0F * progress, (float) Math.PI,
+                            1.2707963F + 1.8707964F * progress);
+                } else {
+                    float progress = (cycle - 22.0F) / 4.0F;
+                    applyArm(model.bipedLeftArm, leftAnimation,
+                            (float) Math.PI / 2.0F * (1.0F - progress),
+                            (float) Math.PI, (float) Math.PI);
+                    applyArm(model.bipedRightArm, rightAnimation,
+                            (float) Math.PI / 2.0F * (1.0F - progress),
+                            (float) Math.PI, (float) Math.PI);
+                }
+
+                model.bipedLeftLeg.rotateAngleX = lerp(animation, model.bipedLeftLeg.rotateAngleX,
+                        0.3F * MathHelper.cos(limbSwing * 0.33333334F + (float) Math.PI));
+                model.bipedRightLeg.rotateAngleX = lerp(animation, model.bipedRightLeg.rotateAngleX,
+                        0.3F * MathHelper.cos(limbSwing * 0.33333334F));
+                ModelBiped.copyModelAngles(model.bipedHead, model.bipedHeadwear);
+            }
+        }
+        applySpyglassPose(model, player);
+    }
+
+    private static void applySpyglassPose(ModelBiped model, EntityPlayer player) {
+        if (!player.isHandActive() || player.getItemInUseCount() <= 0
+                || player.getActiveItemStack().isEmpty()
+                || player.getActiveItemStack().getItem() != FFDItems.SPYGLASS) {
             return;
         }
-        float partialTicks = MathHelper.clamp(ageInTicks - player.ticksExisted, 0.0F, 1.0F);
-        float animation = getSwimAnimation(player, partialTicks);
-        if (animation <= 0.0F) {
-            return;
+        EnumHandSide activeSide = player.getActiveHand() == EnumHand.MAIN_HAND
+                ? player.getPrimaryHand() : player.getPrimaryHand().opposite();
+        ModelRenderer arm = activeSide == EnumHandSide.RIGHT
+                ? model.bipedRightArm : model.bipedLeftArm;
+        float crouch = player.isSneaking() ? 0.2617994F : 0.0F;
+        arm.rotateAngleX = MathHelper.clamp(model.bipedHead.rotateAngleX - 1.9198622F - crouch,
+                -2.4F, 3.3F);
+        if (model.isSneak) {
+            arm.rotateAngleX += 0.4F;
         }
-
-        model.bipedHead.rotateAngleX = rotLerp(animation, model.bipedHead.rotateAngleX,
-                -(float) Math.PI / 4.0F);
-        float cycle = limbSwing % 26.0F;
-        if (cycle < 0.0F) {
-            cycle += 26.0F;
-        }
-        EnumHandSide activeSide = activeSwingingSide(player);
-        float rightAnimation = activeSide == EnumHandSide.RIGHT && model.swingProgress > 0.0F
-                ? 0.0F : animation;
-        float leftAnimation = activeSide == EnumHandSide.LEFT && model.swingProgress > 0.0F
-                ? 0.0F : animation;
-
-        if (cycle < 14.0F) {
-            applyArm(model.bipedLeftArm, leftAnimation, 0.0F, (float) Math.PI,
-                    (float) Math.PI + 1.8707964F * armAngle(cycle) / armAngle(14.0F));
-            applyArm(model.bipedRightArm, rightAnimation, 0.0F, (float) Math.PI,
-                    (float) Math.PI - 1.8707964F * armAngle(cycle) / armAngle(14.0F));
-        } else if (cycle < 22.0F) {
-            float progress = (cycle - 14.0F) / 8.0F;
-            applyArm(model.bipedLeftArm, leftAnimation, (float) Math.PI / 2.0F * progress,
-                    (float) Math.PI, 5.012389F - 1.8707964F * progress);
-            applyArm(model.bipedRightArm, rightAnimation,
-                    (float) Math.PI / 2.0F * progress, (float) Math.PI,
-                    1.2707963F + 1.8707964F * progress);
-        } else {
-            float progress = (cycle - 22.0F) / 4.0F;
-            applyArm(model.bipedLeftArm, leftAnimation,
-                    (float) Math.PI / 2.0F * (1.0F - progress),
-                    (float) Math.PI, (float) Math.PI);
-            applyArm(model.bipedRightArm, rightAnimation,
-                    (float) Math.PI / 2.0F * (1.0F - progress),
-                    (float) Math.PI, (float) Math.PI);
-        }
-
-        model.bipedLeftLeg.rotateAngleX = lerp(animation, model.bipedLeftLeg.rotateAngleX,
-                0.3F * MathHelper.cos(limbSwing * 0.33333334F + (float) Math.PI));
-        model.bipedRightLeg.rotateAngleX = lerp(animation, model.bipedRightLeg.rotateAngleX,
-                0.3F * MathHelper.cos(limbSwing * 0.33333334F));
-        ModelBiped.copyModelAngles(model.bipedHead, model.bipedHeadwear);
+        arm.rotateAngleY = model.bipedHead.rotateAngleY
+                + (activeSide == EnumHandSide.RIGHT ? -0.2617994F : 0.2617994F);
+        arm.rotateAngleZ = 0.0F;
     }
 
     private static void applyTridentPose(ModelBiped model, float limbSwing,
@@ -182,23 +201,17 @@ public final class FFDClientSwimmingHooks {
             leftX = leftX * 0.5F - (float) Math.PI;
         }
         if (model.isSneak) {
-            if (activeSide == EnumHandSide.RIGHT) {
-                rightX += 0.4F;
-            } else {
-                leftX += 0.4F;
-            }
+            rightX += 0.4F;
+            leftX += 0.4F;
         }
         float idleX = MathHelper.sin(ageInTicks * 0.067F) * 0.05F;
         float idleZ = MathHelper.cos(ageInTicks * 0.09F) * 0.05F + 0.05F;
-        if (activeSide == EnumHandSide.RIGHT) {
-            model.bipedRightArm.rotateAngleX = rightX + idleX;
-            model.bipedRightArm.rotateAngleY = 0.0F;
-            model.bipedRightArm.rotateAngleZ = idleZ;
-        } else {
-            model.bipedLeftArm.rotateAngleX = leftX - idleX;
-            model.bipedLeftArm.rotateAngleY = 0.0F;
-            model.bipedLeftArm.rotateAngleZ = -idleZ;
-        }
+        model.bipedRightArm.rotateAngleX = rightX + idleX;
+        model.bipedRightArm.rotateAngleY = 0.0F;
+        model.bipedRightArm.rotateAngleZ = idleZ;
+        model.bipedLeftArm.rotateAngleX = leftX - idleX;
+        model.bipedLeftArm.rotateAngleY = 0.0F;
+        model.bipedLeftArm.rotateAngleZ = -idleZ;
     }
 
     public static void applyPlayerRotations(AbstractClientPlayer player, float partialTicks) {

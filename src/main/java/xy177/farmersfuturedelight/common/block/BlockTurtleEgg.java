@@ -26,14 +26,12 @@ import net.minecraft.item.ItemStack;
 import net.minecraft.stats.StatList;
 import net.minecraft.tileentity.TileEntity;
 import net.minecraft.util.EnumFacing;
-import net.minecraft.util.EnumParticleTypes;
 import net.minecraft.util.SoundCategory;
 import net.minecraft.block.material.EnumPushReaction;
 import net.minecraft.util.math.AxisAlignedBB;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.world.IBlockAccess;
 import net.minecraft.world.World;
-import net.minecraft.world.WorldServer;
 import net.minecraftforge.common.ForgeHooks;
 import net.minecraftforge.event.ForgeEventFactory;
 import net.minecraftforge.fml.common.registry.EntityEntry;
@@ -184,10 +182,8 @@ public class BlockTurtleEgg extends Block {
     @Override
     public void onBlockAdded(World world, BlockPos pos, IBlockState state) {
         super.onBlockAdded(world, pos, state);
-        if (!world.isRemote && world instanceof WorldServer && isOnSand(world, pos)) {
-            ((WorldServer) world).spawnParticle(EnumParticleTypes.VILLAGER_HAPPY,
-                    pos.getX() + 0.5D, pos.getY() + 0.5D, pos.getZ() + 0.5D,
-                    15, 0.5D, 0.5D, 0.5D, 0.0D);
+        if (!world.isRemote && isOnSand(world, pos)) {
+            world.playEvent(2005, pos, 15);
         }
     }
 
